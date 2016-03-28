@@ -1,0 +1,525 @@
+﻿
+@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Modify Product";
+
+    var Id = UrlData[0].AsInt();
+    var hasId = !string.IsNullOrEmpty(UrlData[0]);
+
+    var itemType = hasId ? _common.getItemTypeByProductId(Id) : null;
+    var foodItem = false; var sushiItem = false; var rollItem = false;
+    
+
+    Product currentItem = null;
+    if(string.Equals(itemType, "Roll")){
+        if(hasId){currentItem = _common.getRollProduct(Id);}
+        else{currentItem = new Roll();}
+        rollItem = true; sushiItem = true; foodItem = true;
+    } else if(string.Equals(itemType, "Sushi")){
+        if(hasId){currentItem = _common.getSushiProduct(Id);}
+        else{currentItem = new Sushi();}
+        sushiItem = true; foodItem = true;
+    } else if(string.Equals(itemType, "Food")){
+        if(hasId){currentItem = _common.getFoodProduct(Id);}
+        else{currentItem = new Food();}
+        foodItem = true;
+    } else if(hasId){currentItem = new Product(Id);
+    } else{currentItem = new Product();}
+
+
+    // Setup validation
+    Validation.RequireField("pName", "You must specify an name.");
+    Validation.RequireField("pPrice", "You must specify a price.");
+    
+    
+    
+        /* Product types for updated item */
+        var nFoodItem = false; var nSushiItem = false; var nRollItem = false;
+        
+        /* Declare new product to hold updated information */
+        Product updatedItem = new Product();
+
+        var productType = "";
+        var foodType = "";
+        var sushiType = "";
+        var rollType = "";
+
+    if (IsPost && Validation.IsValid()) {
+        /* Find type of product (product>food>sushi>roll) */
+        productType = Request["pType"].AsInt() != 0 ? _common.getProductTypes().Where(a => a.pkProductTypeId == Request["pType"].AsInt()).First().ProductTypeName : "";
+        foodType = Request["fType"].AsInt() != 0 ? _common.getFoodTypes().Where(a => a.pkFoodTypeId == Request["fType"].AsInt()).First().FoodTypeName : "";
+        sushiType = Request["sType"].AsInt() != 0 ? _common.getSushiTypes().Where(a => a.pkSushiTypeId == Request["sType"].AsInt()).First().SushiTypeName : "";
+        rollType = Request["rType"].AsInt() != 0 ? _common.getRollTypes().Where(a => a.pkRollTypeId == Request["rType"].AsInt()).First().RollTypeName : "";
+
+        /* Get IDs of product types of a corresponding type below it (if product type is a "Roll", get sushitype that is a roll, etc.) */
+        SushiType sushiTypeRoll = _common.getSushiTypes().Where(n => string.Equals(n.SushiTypeName, "Roll")).First();
+        FoodType foodTypeSushi = _common.getFoodTypes().Where(n => string.Equals(n.FoodTypeName, "Sushi")).First();
+        ProductType productTypeFood = _common.getProductTypes().Where(n => string.Equals(n.ProductTypeName, "Food")).First();
+
+        
+
+        /* Figure out what kind of product the updated product is and set type-specific data accordingly */
+        /* New product is a roll */
+        if(string.Equals(sushiType, "Roll")){
+            if(rollItem && hasId){updatedItem = new Roll(((Roll)currentItem));}
+            else if(sushiItem && hasId){updatedItem = new Roll(((Sushi)currentItem));}
+            else if(foodItem && hasId){updatedItem = new Roll((Food)currentItem);}
+            else if(hasId){updatedItem = new Roll(((Product)currentItem));}
+            else{updatedItem = new Roll();}
+
+            nRollItem = true; nSushiItem = true; nFoodItem = true;
+            ((Roll)updatedItem).RType = string.IsNullOrEmpty(rollType) ? new RollType(2) : new RollType(Request["rType"].AsInt());
+            ((Roll)updatedItem).SType = new SushiType(sushiTypeRoll.pkSushiTypeId);
+            ((Roll)updatedItem).FType = new FoodType(foodTypeSushi.pkFoodTypeId);
+            ((Roll)updatedItem).PType = new ProductType(productTypeFood.pkProductTypeId);
+        } else if(string.Equals(foodType, "Sushi")){
+            if(rollItem && hasId){updatedItem = new Sushi(((Roll)currentItem));}
+            else if(sushiItem && hasId){updatedItem = new Sushi(((Sushi)currentItem));}
+            else if(foodItem && hasId){updatedItem = new Sushi(((Food)currentItem));}
+            else if(hasId){updatedItem = new Sushi(((Product)currentItem));}
+            else{updatedItem = new Sushi();}
+            nSushiItem = true; nFoodItem = true;
+
+            ((Sushi)updatedItem).SType = string.IsNullOrEmpty(sushiType) ? new SushiType(1) : new SushiType(Request["sType"].AsInt());
+            ((Sushi)updatedItem).FType = new FoodType(foodTypeSushi.pkFoodTypeId);
+            ((Sushi)updatedItem).PType = new ProductType(productTypeFood.pkProductTypeId);
+        } else if(string.Equals(productType, "Food")){
+            if(rollItem && hasId){updatedItem = new Food(((Roll)currentItem));}
+            else if(sushiItem && hasId){updatedItem = new Food(((Sushi)currentItem));}
+            else if(foodItem && hasId){updatedItem = new Food(((Food)currentItem));}
+            else if(hasId){updatedItem = new Food(((Product)currentItem));}
+            else{updatedItem = new Food();}
+            
+            nFoodItem = true;
+            ((Food)updatedItem).FType = string.IsNullOrEmpty(foodType) ? new FoodType(1) : new FoodType(Request["fType"].AsInt());
+            ((Food)updatedItem).PType = new ProductType(productTypeFood.pkProductTypeId);
+        } else{
+            if(rollItem && hasId){updatedItem = new Product(((Roll)currentItem));}
+            else if(sushiItem && hasId){updatedItem = new Product(((Sushi)currentItem));}
+            else if(foodItem && hasId){updatedItem = new Product(((Food)currentItem));}
+            else if(hasId){updatedItem = new Product(((Product)currentItem));}
+            else{updatedItem = new Product();}
+            
+            updatedItem.PType = string.IsNullOrEmpty(productType) ? new ProductType(1) : new ProductType(Request["pType"].AsInt());
+        };
+
+        /* Assign all base class data */
+        updatedItem.Name = Request["pName"];
+        updatedItem.JPName = Request["pJPName"] == "" ? null : Request["pJPName"];
+        updatedItem.Description = Request["pDesc"];
+        updatedItem.imgURL = Request["pimgUrl"];
+        updatedItem.imgThumbURL = Request["pimgThumbUrl"];
+        updatedItem.imgSpURL = Request["pimgSpUrl"];
+        updatedItem.imgLargeURL = Request["pimgLargeUrl"];
+        updatedItem.discontinued = Request["isDiscontinued"].ToLower().AsBool();
+        updatedItem.SpecialBeginDate = Request["beginDate"].AsDateTime();
+        updatedItem.SpecialEndDate = Request["endDate"].AsDateTime();
+
+        
+        /* If this is food, get food data */
+        if(nFoodItem){
+            ((Food)updatedItem).Ingredients.Clear();
+            if(!Request["inside"].IsEmpty()){
+                foreach (var selection in Request["inside"].Split(',')){
+                    ((Food)updatedItem).Ingredients.Add(new Ingredient(selection.AsInt()));
+                }
+            }
+
+            /* If this is a roll, get roll data */
+            if(nRollItem){
+                ((Roll)updatedItem).SecondaryIngredients.Clear();
+                if(!Request["onTop"].IsEmpty()){
+                    foreach (var selection in Request["onTop"].Split(',')){
+                        ((Roll)updatedItem).SecondaryIngredients.Add(new Ingredient(selection.AsInt()));
+                    }
+                }
+
+                /* Add product options */
+                ((Roll)updatedItem).Options.Clear();
+                if(!Request["rollOptions"].IsEmpty()){
+                    foreach(var selection in Request["rollOptions"].Split(',')){
+                        ((Roll)updatedItem).Options.Add(new OrderOption(selection.AsInt()));
+                    }
+                }
+            }
+        }
+
+        updatedItem.Tags.Clear();
+        if(!Request["tags"].IsEmpty()){
+            foreach (var selection in Request["tags"].Split(',')){
+                updatedItem.Tags.Add(new Tag(selection.AsInt()));
+            }
+        }
+
+        updatedItem.ProductOptions.Clear();
+        if(!Request["pOptions"].IsEmpty()){
+            foreach(var selection in Request["pOptions"].Split(',')){
+                updatedItem.ProductOptions.Add(new ProductOption(selection.AsInt()));
+            }
+        }
+
+        /* Calculate Cost */
+        if(Request["priceOverride"] == "on"){
+            updatedItem.Cost = Request["pCost"].Trim('$').AsDecimal();
+            updatedItem.Price = Request["pPrice"].Trim('$').AsDecimal();
+        }
+        else if(nRollItem){
+            updatedItem.Cost = ((Roll)updatedItem).calculateCost();
+            updatedItem.Price = ((Roll)updatedItem).calculatePrice();
+        }
+        else if(nFoodItem){
+            updatedItem.Cost = ((Food)updatedItem).calculateCost();
+            updatedItem.Price = ((Food)updatedItem).calculatePrice();
+        }
+        else{updatedItem.Price = Request["pPrice"].Trim('$').AsDecimal();}
+        
+        
+        /* Update information in the database to reflect new information/changes */
+        if(ModelState.IsValid){
+            /* Working with a pre-existing object */
+            if(hasId){
+                /* Check if the new item is a roll type item */
+                if(nRollItem){
+                    if(!foodItem){((Roll)updatedItem).addFood();}
+                    if(!sushiItem){((Roll)updatedItem).addSushi();}
+                    if(!rollItem){((Roll)updatedItem).addRoll();}
+
+                    /* Modify the newly created or original roll item and all base classes */
+                    ((Roll)updatedItem).modifyRoll();
+                } else if(nSushiItem){
+                    if(!foodItem){((Sushi)updatedItem).addFood();}
+                    if(!sushiItem){((Sushi)updatedItem).addSushi();}
+
+                     /* Modify the newly created or original sushi item and all base classes */
+                    ((Sushi)updatedItem).modifySushi();
+                } else if(nFoodItem){
+                    if(!foodItem){((Food)updatedItem).addFood();}
+
+                    /* Modify the newly created or original food item and all base classes */
+                    ((Food)updatedItem).modifyFood();
+                } else{updatedItem.modifyProduct();}
+            }
+            /* Completely new object, just add info */
+            else{
+                if(nRollItem){((Roll)updatedItem).addNewRoll();}
+                else if(nSushiItem){((Sushi)updatedItem).addNewSushi();}
+                else if(nFoodItem){((Food)updatedItem).addNewFood();}
+                else{updatedItem.addProduct();}
+            }
+        }
+        
+        Response.Redirect("~/admin/manageProducts/");
+        
+    }
+}
+
+<script>
+    $(document).ready(function () {
+        /* BEGIN SHOW/HIDE FUNCTIONALITY FOR DIFFERENT TYPES OF PRODUCTS */
+        $('.foodItem').hide();
+        $('.sushiItem').hide();
+        $('.rollItem').hide();
+        $("#pType option:selected").each(function () { if ($(this).text() == "Food") { showAllFoodInfo(); } else { hideAllFoodInfo(); }});
+        $("#fType option:selected").each(function () {if ($(this).text() == "Sushi") { showAllSushiInfo(); }else { hideAllSushiInfo(); }});
+        $("#sType option:selected").each(function () { if ($(this).text() == "Roll") { showAllRollInfo(); }else { hideAllRollInfo(); }});
+        $("#pType").change(function () {$("#pType option:selected").each(function () {
+            if ($(this).text() == "Food") { showAllFoodInfo(); }else { hideAllFoodInfo(); }});
+        });
+        $("#fType").change(function () {
+            $("#fType option:selected").each(function () {if ($(this).text() == "Sushi") { showAllSushiInfo(); }else { hideAllSushiInfo(); }});
+        });
+        $("#sType").change(function () {
+            $("#sType option:selected").each(function () {if ($(this).text() == "Roll") { showAllRollInfo(); }else { hideAllRollInfo(); }});
+        });
+
+        function showAllFoodInfo() { $('.foodItem').show(); }
+        function hideAllFoodInfo() {
+            $('.foodItem').hide(); $('#fType').val('-1');
+            $('.sushiItem').hide(); $('#sType').val('-1');
+            $('.rollItem').hide(); $('#rType').val('-1');
+        }
+        function showAllSushiInfo() { $('.sushiItem').show(); }
+        function hideAllSushiInfo() {
+            $('.sushiItem').hide(); $('#sType').val('-1');
+            $('.rollItem').hide();$('#rType').val('-1');
+        }
+        function showAllRollInfo() { $('.rollItem').show(); }
+        function hideAllRollInfo() { $('.rollItem').hide(); $('#rType').val('-1'); }
+        /* END SHOW/HIDE FUNCTIONALITY FOR DIFFERENT TYPES OF PRODUCTS */
+        
+        /* Set CSS on discontinued section if product is discontinued */
+        if ($("#pDiscontinued").is(':checked')){
+            $(".discontinue-checkbox").css("background-color", "#f00");
+            $(".discontinue-checkbox label").css("color", "#fff");
+        }
+
+        /* Array of all top ingredients */
+        var topIngredients = [];
+        /* If ingredients already exist, assign them to the array */
+        @if(rollItem){
+            foreach(Ingredient i in ((Roll)currentItem).SecondaryIngredients){
+                <text>topIngredients.push({ Id: '@i.pkIngredientId', Name: '@i.IngredientName', Group: '@i.IGroup.GroupName', Price: @i.IngredientPricePerRoll });</text>
+            }
+        }
+        /* Array of all inside/normal ingredients */
+        var insideIngredients = [];
+        /* If ingredients already exist, assign them to the array */
+        @if(foodItem){
+            foreach(Ingredient i in ((Food)currentItem).Ingredients){
+                <text>insideIngredients.push({ Id: '@i.pkIngredientId', Name: '@i.IngredientName', Group: '@i.IGroup.GroupName', Price: @i.IngredientPricePerRoll });</text>
+            }
+        }
+
+        /* Array of product options */
+        var options = [];
+        @if(rollItem){
+            foreach(OrderOption op in ((Roll)currentItem).Options){
+                <text>options.push({ Id: '@op.pkOptionId', Name: '@op.OptionName', Price: @op.OptionPrice });</text>
+            }
+        }
+        /* Qty of rolls desired, 1 since we are simply adding/modifying a roll*/
+        var qty = 1;
+                
+
+        /* Adding an ingredient over the top of the roll */
+        $(".topIngredient").change(function () {
+            var ingredientId = $(this).parent("span").find("input[name$='onTop']").val();
+            var ingredientName = $(this).parent("span").find("label").text();
+            var ingredientGroup = $(this).parent("span").find("input.group").val();
+            var ingredientPrice = parseFloat($(this).parent("span").find("input.ingredient-price").val());
+            /* User has checked an ingredient */
+            if ($(this).is(':checked')) {topIngredients.push({ Id: ingredientId, Name: ingredientName, Group: ingredientGroup, Price: ingredientPrice });} /* Add ingredient to the array */
+            /* User has unchecked an ingredient */
+            else if (!$(this).is(':checked')) {removeArrayItem(topIngredients, ingredientId);} /* Remove ingredient from the array */
+            /* Calculate and show user the updated price */
+            $("#pPrice").val("$" + calculateCost(topIngredients, insideIngredients, options, qty));
+        }); /* #END .topIngredient.change */
+
+        
+
+        /* Adding an ingredient inside the roll */
+        $(".insideIngredient").change(function () {
+            var ingredientId = $(this).parent("span").find("input[name$='inside']").val();
+            var ingredientName = $(this).parent("span").find("label").text();
+            var ingredientGroup = $(this).parent("span").find("input.group").val();
+            var ingredientPrice = parseFloat($(this).parent("span").find("input.ingredient-price").val());
+
+            /* User has checked an ingredient */
+            if ($(this).is(':checked')) {insideIngredients.push({ Id: ingredientId, Name: ingredientName, Group: ingredientGroup, Price: ingredientPrice });} /* Add ingredient to the array */
+            /* User has unchecked an ingredient */
+            else if (!$(this).is(':checked') && $(this).is(':checkbox')) {removeArrayItem(insideIngredients, ingredientId);} /* Remove ingredient from the array */
+            /* Calculate and show user the updated price */
+            $("#pPrice").val("$" + calculateCost(topIngredients, insideIngredients, options, qty));
+        }); /* #END .insideIngredient.change */
+
+                    
+        /* Add/Remove Options */
+        $(".roll-option").change(function () {
+            var optionId = $(this).parent("span").find(".option-id").val();
+            var optionName = $(this).parent("span").find(".option-name").text();
+            var optionPrice = parseFloat($(this).parent("span").find(".option-price").val());
+
+            /* User has checked an option */
+            if ($(this).is(':checked')) {options.push({ Id: optionId, Name: optionName, Price: optionPrice });} /* Add option to the array */
+            /* User has unchecked an option */
+            else if (!$(this).is(':checked') && $(this).is(':checkbox')) {removeArrayItem(options, optionId);} /* Remove option from the array */
+            /* Calculate and show user the updated price */
+            $("#pPrice").val("$" + calculateCost(topIngredients, insideIngredients, options, qty));
+        }); /* #END .insideIngredient.change */
+            
+
+        
+
+        $("#pDiscontinued").change(function(){
+            if($(this).is(':checked')){
+                $(".discontinue-checkbox").css("background-color", "#f00");
+                $(".discontinue-checkbox label").css("color", "#fff");
+                $("#isDiscontinued").val("true");
+            } else{
+                $(".discontinue-checkbox").css("background-color", "rgba(230, 235, 222, 1)");
+                $(".discontinue-checkbox label").css("color", "#444");
+                $("#isDiscontinued").val("false");
+            }
+        });
+    });
+
+
+    
+    $(function () {
+        $("#beginDate").datepicker({ minDate: 0 }).datepicker(function () {
+            $("#beginDate").datepicker("option", "dateFormat", 'mm/dd/yy');
+        });
+        $("#endDate").datepicker({ minDate: 1, changeYear: true }).datepicker(function () {
+            $("#endDate").datepicker("option", "dateFormat", 'mm/dd/yy');
+        });
+    });
+
+</script>
+    
+
+<section id="modifyProduct" class="modify-item">
+    <header>
+        <h3>
+            <span class="page-title">
+                <a href="~/admin/manageProducts/" class="arrow">&larr;</a>
+                @{if(hasId){<text>Modify</text>}else{<text>Add</text>}} Product @{if(hasId){<text>(@currentItem.Name)</text>}}
+            </span>
+            <span class="discontinue-checkbox">
+                <input type="checkbox" id="pDiscontinued" name="pDiscontinued" checked="@currentItem.discontinued" />
+                <label for="pDiscontinued">Discontinued</label>
+            </span>
+        </h3>
+    </header>
+    
+    <form id="frmModify" method="post" action="">
+        <input type="hidden" id="isDiscontinued" name="isDiscontinued" value="@currentItem.discontinued" />
+
+        <ul>
+            <li>
+                <label for="pName">Name:</label>
+                <input type="text" id="pName" name="pName" value="@currentItem.Name" @Validation.For("pName") />
+                <div>@Html.ValidationMessage("pName")</div>
+            </li>
+
+            <li>
+                <label for="pJPName">JP Name:</label>
+                <input type="text" id="pJPName" name="pJPName" value="@currentItem.JPName" />
+            </li>
+
+            <li>
+                <label for="pDesc">Desc:</label>
+                <textarea id="pDesc" name="pDesc" class="desc">@currentItem.Description</textarea>
+            </li>
+
+            <li>
+                @Helpers.productTypes(currentItem.PType.pkProductTypeId)
+            </li>
+
+            <li class="foodItem">
+                @if(foodItem){@Helpers.foodTypes(((Food)currentItem).FType.pkFoodTypeId)}
+                else{@Helpers.foodTypes(1)}
+            </li>
+
+            <li class="sushiItem">
+                @if(sushiItem){@Helpers.sushiTypes(((Sushi)currentItem).SType.pkSushiTypeId)}
+                else{@Helpers.sushiTypes(1)}
+            </li>
+
+            <li class="rollItem">
+                @if(rollItem){@Helpers.rollTypes(((Roll)currentItem).RType.pkRollTypeId)}
+                else{@Helpers.rollTypes(1)}
+            </li>
+
+            <li>
+                <fieldset>
+                    <legend>Special</legend>
+                    <label for="beginDate">Special Begin Date:</label>
+                    <input type="text" id="beginDate" name="beginDate" value="@currentItem.SpecialBeginDate" @Validation.For("beginDate") />
+                    <br />
+                    <label for="endDate">Special End Date:</label>
+                    <input type="text" id="endDate" name="endDate" value="@currentItem.SpecialEndDate" @Validation.For("beginDate") />
+                    <div>@Html.ValidationMessage("beginDate")</div>
+                    <div>@Html.ValidationMessage("endDate")</div>
+                </fieldset>
+            </li>
+        </ul>
+
+        <ul>
+            <li id="Ingredients" class="ingredients foodItem">
+                <p class="bold">Product Ingredients: </p>
+                <p class="error">@Html.ValidationMessage("ingredients")</p>
+                @if(foodItem){@Helpers.IngredientCheckboxes((Food)currentItem)}
+                else{@Helpers.IngredientCheckboxes()}
+            </li>
+            
+            <li id="secondaryIngredients" class="ingredients rollItem">
+                <p class="bold">
+                    Secondary Ingredients (Primarily Uramaki):
+                </p>
+                @if(rollItem){@Helpers.topIngredientCheckboxes((Roll)currentItem)}
+                else{@Helpers.topIngredientCheckboxes()}
+            </li>
+
+            <li id="productOptions" class="product-options rollItem">
+                <p class="bold">Product Options:</p>
+                <fieldset>
+                    <legend>Options</legend>
+                    @if(rollItem){@Helpers.OptionCheckboxes((Roll)currentItem)}
+                    else{@Helpers.OptionCheckboxes()}
+                </fieldset>
+            </li>
+
+            
+            <li id="tags" class="tags">
+                <p class="bold">"Tag" the product: </p>
+                <p class="error">@Html.ValidationMessage("tags")</p>
+
+                <fieldset>
+                    <legend>Tags</legend>
+                    @Helpers.TagCheckboxes(currentItem)
+                </fieldset>
+            </li>
+
+            <li id="options" class="options">
+                <fieldset>
+                    <legend>Product Options</legend>
+                    @if(currentItem.ProductOptions.Any()){@Helpers.ProductOptionCheckboxes(currentItem);}
+                    else{@Helpers.ProductOptionCheckboxes();}
+                </fieldset>
+            </li>
+        </ul>
+        
+        <ul>
+            <li>
+                <input type="checkbox" id="costOverride" name="costOverride" />
+                <label for="costOverride">Override Cost Calculation</label>
+                <br />
+                <label for="pCost">Cost:</label>
+                <input type="text" id="pCost" name="pCost" class="cost" value="@string.Format("{0:C}", currentItem.Cost)" @Validation.For("pCost") />
+                <div>@Html.ValidationMessage("pCost")</div>
+            </li>
+
+            <li>
+                <input type="checkbox" id="priceOverride" name="priceOverride" />
+                <label for="priceOverride">Override Price Calculation</label>
+                <br />
+                <label for="pPrice">Price:</label>
+                <input type="text" id="pPrice" name="pPrice" class="price" value="@string.Format("{0:c}", currentItem.Price)" @Validation.For("pPrice") />
+                <div>@Html.ValidationMessage("pPrice")</div>
+            </li> 
+
+            <li>
+                <header>
+                    <h3>Images</h3>
+                    <small>(Images should be located at "/images/sushi/[imagename].jpg")</small>
+                </header>
+            </li>
+
+            <li>
+                <label for="pimgURL">Image URL:</label>
+                <input type="text" id="pimgURL" name="pimgURL" class="desc" value="@currentItem.imgURL" /> <small>(250x250px)</small>
+            </li>
+
+            <li>
+                <label for="pimgThumbURL">Thumbnail:</label>
+                <input type="text" id="pimgThumbURL" name="pimgThumbURL" class="desc" value="@currentItem.imgThumbURL" /> <small>(100x100px)</small>
+            </li>
+
+            <li>
+                <label for="pimgSpURL">Special URL:</label>
+                <input type="text" id="pimgSpURL" name="pimgSpURL" class="desc" value="@currentItem.imgSpURL" /> <small>(1000x400px)</small>
+            </li>
+
+            <li>
+                <label for="pimgLargeUrl">Large IMG URL:</label>
+                <input type="text" id="pimgLargeUrl" name="pimgLargeUrl" class="desc" value="@currentItem.imgLargeURL" /> <small>(Any)</small>
+            </li>
+
+            <li class="actions">
+                <input type="submit" value="@{if(hasId){<text>Save Changes</text>}else{<text>Add New</text>}}" />
+                <button formaction="~/admin/manageProducts">Cancel</button>
+                @if(Roles.IsUserInRole("Master") && hasId){<button formaction="~/admin/deleteProductConfirm/@currentItem.pkProductId" class="deleteButton">Delete</button>}
+            </li>
+        </ul>
+    </form>
+</section>

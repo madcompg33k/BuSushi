@@ -1,0 +1,14 @@
+﻿@{
+    //WebSecurity.RequireRoles("Administrator", "Master");
+
+    var Id = Request["Id"];
+    var Name = Request["Name"];
+
+    var db = Database.Open("buSushi");
+    var sql = "UPDATE Tags SET Tag = @0 WHERE pkTagId = @1";
+    db.Execute(sql, Name, Id);
+    sql = "SELECT Tag FROM Tags WHERE pkTagId = @0";
+    var result = db.QuerySingle(sql, Id);
+    
+    Json.Write(result, Response.Output);
+}

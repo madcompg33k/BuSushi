@@ -1,0 +1,17 @@
+﻿@{
+    if (!Roles.IsUserInRole("Master")){Response.Redirect("~/");}
+
+    var id = UrlData[0].AsInt();
+    CustomerRoll currentItem = null;
+
+    if(id != null){
+        currentItem = new CustomerRoll(id);
+        currentItem.deleteRoll();
+        Response.Redirect("~/admin/deleteComplete", true, "customerRolls");
+    }
+    else{
+        currentItem = new CustomerRoll();
+        Response.Redirect("~/admin/deleteComplete", false, "customerRolls");
+    }
+
+}

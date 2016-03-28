@@ -1,0 +1,32 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Delete Roll";
+
+    if (!Roles.IsUserInRole("Master")){
+        Response.Redirect("~/");
+    }
+
+    var id = UrlData[0].AsInt();
+    
+    Roll currentItem;
+    if(id != null){currentItem = new Roll(_common.getRollProduct(id));}
+    else{
+        currentItem = new Roll();
+        Response.Redirect("~/admin/");
+    }
+}
+    
+
+<section id="deleteProductRoll">
+    <header>
+        <h3>Delete Roll (@currentItem.Name)</h3>
+    </header>
+
+    <form id="frmDelete" method="delete" action="~/admin/deleteRoll/@id">
+        <h2>Are you sure you want to delete @currentItem.Name? (ID: @currentItem.pkId)</h2>
+        <small>(This action is irreversible)</small>
+
+        <input type="submit" value="Yes" />
+        <button formaction="~/admin/modifyRoll/@id">No</button>
+    </form>
+</section>

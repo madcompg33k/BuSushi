@@ -1,0 +1,33 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Manage Schedule";
+
+    var schedGrid = new WebGrid(_common.getScheduleItems(), rowsPerPage: 15);
+}
+
+<section id="manageSchedule">
+    <header>
+        <h3><a href="~/admin">&larr;</a>@Page.Title</h3> <small><a href="~/admin/modifyScheduleItem/">Add New</a></small>
+    </header>
+
+    <div>
+        @schedGrid.GetHtml(
+            tableStyle: "webGrid",
+            headerStyle: "head",
+            alternatingRowStyle: "alt",
+            columns: schedGrid.Columns(
+                schedGrid.Column("DeliveryDate", "Date",
+                    format: @<a href="@Href("~/admin/modifyScheduleItem", item.pkDeliveryId)">@(((DateTime)item.DeliveryDate).ToShortDateString())</a>
+                ),
+                schedGrid.Column("DCity.CityName", "City"),
+                schedGrid.Column("DCity.ZipCode", "Zip"),
+                schedGrid.Column("",
+                    style: "options",
+                    format:
+                        @<text>
+                            @if(Roles.IsUserInRole("Master")){<a href="~/admin/deleteScheduleItemConfirm/@item.pkDeliveryId" class="deleteButton">(Delete)</a>}
+                        </text>)
+            )
+        )
+    </div>
+</section>

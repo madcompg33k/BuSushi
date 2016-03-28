@@ -1,0 +1,121 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Modify Ingredient";
+
+    var ingredientId = UrlData[0].AsInt();
+    var hasId = !string.IsNullOrEmpty(UrlData[0]);
+    
+    var db = Database.Open("buSushi");
+    var groupList = db.Query("SELECT DISTINCT pkGroupId, GroupName FROM IngredientGroups")
+                            .Select(group => new SelectListItem {
+                                Value = group.pkGroupId.ToString(),
+                                Text = group.GroupName
+                            });
+    db.Close();
+
+    Ingredient ingredient;
+    if(hasId){ingredient = new Ingredient(ingredientId);}
+    else{ingredient = new Ingredient(); ingredient.Active = true;}
+    
+
+    // Setup validation
+    Validation.RequireField("iName", "You must specify an name.");
+    Validation.RequireField("iCost", "You must specify a cost.");
+    Validation.RequireField("iPrice", "You must specify a price.");
+
+    if (IsPost && Validation.IsValid()) {
+        ingredient.IngredientName = Request["iName"];
+        ingredient.IngredientAltName = Request["iAltName"] == "" ? null : Request["iAltName"];
+        ingredient.SecondaryIngredient = Request["iTopIngredient"] == "on" ? true : false;
+        ingredient.Description = Request["iDesc"];
+        ingredient.IGroup.pkGroupId = Request["iGroup"].AsInt();
+        ingredient.IngredientCostPerPiece = Request["iCost"].Trim('$').AsDecimal();
+        ingredient.IngredientPricePerRoll = Request["iPrice"].Trim('$').AsDecimal();
+        ingredient.Active = Request["iActive"] == "on" ? true : false;
+        ingredient.MakeARollIngredient = Request["iMakeARollIngredient"] == "on" ? true : false;
+
+        if(ModelState.IsValid){
+            if(hasId){
+                ingredient.modifyIngredient();
+            }
+            else{
+                ingredient.addIngredient();
+            }
+        }
+
+        Response.Redirect("~/admin/manageIngredients/");
+        
+    }
+}
+    
+
+
+
+<section id="modifyIngredient">
+    <header>
+        <h3><a href="~/admin/" class="arrow">&larr;</a>
+            @{if(hasId){<text>Modify</text>}else{<text>Add</text>}}
+            Ingredient @{if(hasId){<text>(@ingredient.IngredientName)</text>}}
+        </h3>
+    </header>
+
+    <form id="frmModify" method="post" action="">
+        <input type="hidden" id="iId" name="iId" value="@ingredient.pkIngredientId" />
+        
+        <ul>
+            <li>
+                <label for="iName">Name:</label>
+                <input type="text" id="iName" name="iName" value="@ingredient.IngredientName" @Validation.For("iName") />
+                <div>@Html.ValidationMessage("iName")</div>
+            </li>
+
+            <li>
+                <label for="iAltName">Alternate Name:</label>
+                <input type="text" id="iAltName" name="iAltName" value="@ingredient.IngredientAltName" />
+            </li>
+
+            <li class="checkboxes">
+                    <label for="iTopIngredient">Can this ingredient go on top?</label>
+                    <input type="checkbox" id="iTopIngredient" name="iTopIngredient" checked="@ingredient.SecondaryIngredient" />
+            </li>
+
+            <li>
+                <label for="iDesc">Description:</label>
+                <textarea id="iDesc" name="iDesc" class="desc">@ingredient.Description</textarea>
+            </li>
+
+            <li>
+                <label for="iGroup">Ingredient Group:</label>
+                @Html.DropDownList("iGroup", null, groupList, ingredient.IGroup.pkGroupId, new {@class="ingredientField", name="iGroup"})
+            </li>
+
+            <li>
+                <label for="iCost">Ingredient Cost (what we pay/roll):</label>
+                <input type="text" id="iCost" name="iCost" value="@ingredient.IngredientCostPerPiece" @Validation.For("iCost") />
+            </li>
+
+            <li>
+                <label for="iPrice">Ingredient Price (what we charge):</label>
+                <input type="text" id="iPrice" name="iPrice" value="@ingredient.IngredientPricePerRoll"  @Validation.For("iPrice") />
+                <div>@Html.ValidationMessage("iPrice")</div>
+            </li>
+
+            <li>
+                <label for="iActive">Active?</label>
+                <input type="checkbox" id="iActive" name="iActive" checked="@ingredient.Active" />
+            </li>
+
+            <li>
+                <label for="iMakeARollIngredient">Can this be used in make-a-roll?</label>
+                <input type="checkbox" id="iMakeARollIngredient" name="iMakeARollIngredient" checked="@ingredient.MakeARollIngredient" />
+            </li>
+
+            <li class="actions">
+                <input type="submit" value="@{if(hasId){<text>Save Changes</text>}else{<text>Add New</text>}}" />
+                <button formaction="~/admin/manageIngredients">Cancel</button>
+                @if(Roles.IsUserInRole("Master") && hasId){<button formaction="~/admin/deleteIngredientConfirm/@ingredient.pkIngredientId" class="deleteButton">Delete</button>}
+            </li>
+        </ul>
+
+    </form>
+</section>

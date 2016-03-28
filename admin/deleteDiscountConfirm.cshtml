@@ -1,0 +1,34 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Delete Discount";
+
+    if (!Roles.IsUserInRole("Master")){
+        Response.Redirect("~/");
+    }
+
+    var Id = UrlData[0].AsInt();
+    Discount currentItem;
+    
+    
+    if(Id != null){currentItem = new Discount(Id);}
+    else{
+        currentItem = new Discount();
+        Response.Redirect("~/admin/");
+    }
+}
+    
+
+<section id="deleteTag">
+    <header>
+        <h3>@Page.Title (@currentItem.pkDiscountId)</h3>
+    </header>
+
+    <form id="frmDelete" method="delete" action="~/admin/deleteDiscount/@Id">
+        <h2>Are you sure you want to delete @currentItem.DiscountCode? (ID: @currentItem.DiscountCode)</h2>
+        <small>(This action is irreversible)</small>
+
+        <input type="submit" value="Yes" />
+        <button formaction="~/admin/">No</button>
+    </form>
+    
+</section>

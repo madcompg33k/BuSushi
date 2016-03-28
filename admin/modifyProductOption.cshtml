@@ -1,0 +1,77 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Modify Product Option";
+
+    var Id = UrlData[0].AsInt();
+    var hasId = !string.IsNullOrEmpty(UrlData[0]);
+
+    ProductOption option = null;
+    
+    if(hasId){
+        option = new ProductOption(Id);
+    } else{option = new ProductOption();}
+
+    // Setup validation
+    Validation.RequireField("oName", "You must specify a name.");
+
+    if (IsPost && Validation.IsValid()) {
+        option.OptionName = Request["oName"];
+        option.OptionDescription = Request["oDesc"];
+        option.OGroup = new ProductOptionGroup(Request["oGroup"].AsInt());
+        option.Active = Request["oActive"] == "on" ? true : false;
+      
+
+        if(ModelState.IsValid){
+            if(hasId){
+                option.modifyProductOption();
+            }
+            else{
+                option.addProductOption();
+            }
+        }
+
+        Response.Redirect("~/admin/manageProductOptions/");
+        
+    }
+}
+    
+
+<section id="modifyProductOption">
+    <header>
+        <h3><a href="~/admin/manageProductOptions/" class="arrow">&larr;</a>
+            @{if(hasId){<text>Modify</text>}else{<text>Add</text>}}
+            Product Option @{if(hasId){<text>(@option.OptionName)</text>}}
+        </h3>
+    </header>
+
+    <form id="frmModify" method="post" action="">
+        <ul>
+            <li>
+                <label for="oName">Name:</label>
+                <input type="text" id="oName" name="oName" value="@option.OptionName" @Validation.For("oName") />
+                <div>@Html.ValidationMessage("oName")</div>
+            </li>
+
+            <li>
+                <label for="oDesc">Description:</label>
+                <input type="text" id="oDesc" name="oDesc" value="@option.OptionDescription" />
+            </li>
+
+            <li>
+                @if(hasId){@Helpers.ProductOptionGroups(option.OGroup.pkProductOptionGroupId)}
+                else{@Helpers.ProductOptionGroups(0)}
+            </li>
+
+            <li class="checkboxes">
+                <input type="checkbox" id="oActive" name="oActive" checked="@option.Active" />
+                <label for="oActive">Active?</label>
+            </li>
+
+            <li class="actions">
+                <input type="submit" value="@{if(hasId){<text>Save Changes</text>}else{<text>Add New</text>}}" />
+                <button formaction="~/admin/manageProductOptions">Cancel</button>
+                @if(Roles.IsUserInRole("Master") && hasId){<button formaction="~/admin/deleteProductOptionConfirm/@Id" class="deleteButton">Delete</button>}
+            </li>
+        </ul>
+    </form>
+</section>

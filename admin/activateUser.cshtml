@@ -1,0 +1,17 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Activate User";
+
+    var id = UrlData[0].AsInt();
+    var isRecovered = false;
+
+    Customer currentItem = null;
+    if(id != null){
+        currentItem = new Customer(id);
+        currentItem.activateUser();
+        
+        Response.Redirect("~/admin/viewCustomer/" + id);
+    }
+    else{Response.Redirect("~/admin/");}
+
+}

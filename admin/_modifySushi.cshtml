@@ -1,0 +1,245 @@
+﻿
+@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Modify Roll";
+
+    var db = Database.Open("BuSushi");
+
+    var typeList = db.Query("SELECT DISTINCT pkProductTypeId, ProductTypeName FROM ProductTypes")
+                            .Select(type => new SelectListItem {
+                                Value = type.pkProductTypeId.ToString(),
+                                Text = type.ProductTypeName
+                            }); 
+
+    var sushiTypeList = db.Query("SELECT DISTINCT pkSushiTypeId, SushiType FROM SushiTypes")
+                            .Select(type => new SelectListItem {
+                                Value = type.pkSushiTypeId.ToString(),
+                                Text = type.SushiType
+                            });
+
+    var id = UrlData[0].AsInt();
+    var hasId = !string.IsNullOrEmpty(UrlData[0]);
+
+    Sushi currentItem = new Sushi();
+    
+    if(hasId){
+        currentItem = _common.getSushiByProductId(id);
+    }
+
+    // Setup validation
+    Validation.RequireField("pName", "You must specify an name.");
+    Validation.RequireField("pPrice", "You must specify a price.");
+
+    if (IsPost && Validation.IsValid()) {
+        currentItem.Name = Request["pName"];
+        currentItem.JPName = Request["pJPName"] == "" ? null : Request["pJPName"];
+        currentItem.Desc = Request["pDesc"];
+        currentItem.fkProductTypeId = Request["pType"].AsInt();
+        currentItem.fkSushiTypeId = Request["pSushiType"].AsInt();
+        currentItem.Price = Request["pPrice"].Trim('$').AsDecimal();
+        currentItem.isSpecial = Request["pSpecial"] == "on" ? true : false;
+        currentItem.discontinued = Request["pDiscontinued"] == "on" ? true : false;
+        currentItem.imgURL = Request["pimgUrl"];
+        currentItem.imgThumbURL = Request["pimgThumbUrl"];
+        currentItem.imgSpUrL = Request["pimgSpUrl"];        
+
+        currentItem.Ingredients.Clear();
+        if(!Request["pIngredients"].IsEmpty()){
+            foreach (var selection in Request["pIngredients"].Split(',')){
+                currentItem.Ingredients.Add(_common.getIngredientById(selection.AsInt()));
+            }
+        }
+        
+        currentItem.CookingStyles.Clear();
+        if(!Request["cookingStyle"].IsEmpty()){
+            foreach (var selection in Request["cookingStyle"].Split(',')){
+                currentItem.CookingStyles.Add(_common.getCookingStyleById(selection.AsInt()));
+            }
+        }
+
+        currentItem.Tags.Clear();
+        if(!Request["tags"].IsEmpty()){
+            foreach (var selection in Request["tags"].Split(',')){
+                currentItem.Tags.Add(_common.getTagById(selection.AsInt()));
+            }
+        }
+
+        
+        if(ModelState.IsValid){
+            if(hasId){
+                currentItem.modifySushi();
+            }
+            else{
+                currentItem.addSushi();
+            }
+        }
+        
+        Response.Redirect("~/admin/manageSushi/");
+        
+    }
+}
+    
+
+<section id="modifySushi">
+    <header>
+        <h3><a href="~/admin/manageSushi/" class="arrow">&larr;</a>
+            @{if(hasId){<text>Modify</text>}else{<text>Add</text>}}
+            Sushi @{if(hasId){<text>(@currentItem.Name)</text>}}
+        </h3>
+    </header>
+
+    @foreach(var item in currentItem.Ingredients){
+        <p>@item.IngredientName</p>
+    }
+
+
+    <form id="frmModify" method="post" action="">
+        <input type="hidden" id="pId" name="pId" value="@currentItem.pkId" />
+        <input type="hidden" id="rId" name="rId" value="@currentItem.pkSushiId" />
+        
+        <ul>
+            <li>
+                <label for="pName">Name:</label>
+                <input type="text" id="pName" name="pName" value="@currentItem.Name" @Validation.For("pName") />
+                <div>@Html.ValidationMessage("pName")</div>
+            </li>
+
+            <li>
+                <label for="pJPName">JP Name:</label>
+                <input type="text" id="pJPName" name="pJPName" value="@currentItem.JPName" />
+            </li>
+
+            <li>
+                <label for="pDesc">Desc:</label>
+                <textarea id="pDesc" name="pDesc" class="desc">@currentItem.Desc</textarea>
+            </li>
+
+            <li>
+                <label for="pType">Product Type:</label>
+                @Html.DropDownList("pType", null, typeList, currentItem.fkProductTypeId, new {@class="productField", name="pType"})
+            </li>
+
+            <li>
+                <label for="sType">Sushi Type:</label>
+                @Html.DropDownList("pSushiType", null, sushiTypeList, currentItem.fkSushiTypeId, new {@class="productField", name="pSushiType"})
+            </li>
+
+            <li class="checkboxes">
+                <fieldset>
+                    <label for="pSpecial">Special?</label>
+                    <input type="checkbox" id="pSpecial" name="pSpecial" checked="@currentItem.isSpecial" />
+                </fieldset>
+                <fieldset>
+                    <label for="pDiscontinued">Discontinued?</label>
+                    <input type="checkbox" id="pDiscontinued" name="pDiscontinued" checked="@currentItem.discontinued" />
+                </fieldset>
+            </li>
+        </ul>
+
+        <ul>     
+            <li id="ingredients" class="ingredients">
+                <p class="bold">
+                    What ingredients are in the sushi:
+                </p>
+
+                @{foreach(ingredientGroup ig in _common.getIngredientGroups()){
+                    List<Ingredient> ingredientsInGroup = _common.getAllIngredientsInGroup(ig.pkGroupId);
+                    if(ingredientsInGroup.Count() < 1){continue;}
+                    <fieldset>
+                        <legend>@ig.GroupName</legend>
+                        <p>
+                            @foreach(Ingredient i in ingredientsInGroup){
+                                string isChecked = "";
+                                <span>
+                                    @{
+                                        foreach(var x in currentItem.Ingredients){
+                                            if (x.pkIngredientId == i.pkIngredientId){isChecked = "checked";}
+                                        }
+                                    }
+                                    <input type="checkbox" name="pIngredients" id="@i.pkIngredientId" class="ingredient" value="@i.pkIngredientId"
+                                            title="@i.IngredientAltName - @i.Description" @Validation.For("pIngredients") @isChecked />
+                                    <label for="@i.pkIngredientId">@i.IngredientName</label>
+                                    <input type="hidden" id='@i.pkIngredientId-Price' class="ingredient-price" value="@i.IngredientPricePerRoll" />
+                                    <input type="hidden" id="@i.pkIngredientId-Group" class="group" value="@i.GroupName" />
+                                </span>
+                            }
+                        </p>
+                    </fieldset>
+                }}
+            </li>  
+
+
+            <li id="cookingStyles" class="cookingStyles">
+                <p class="bold">Cooking Styles: </p>
+
+                <fieldset>
+                    <legend>Cooking Styles</legend>
+                    <p>
+                        @{foreach(CookingStyle cs in _common.getAllCookingStyles()){
+                            string isChecked = "";
+                            foreach(var x in currentItem.CookingStyles){
+                                if (x.pkCookingStyleId == cs.pkCookingStyleId){isChecked = "checked";}
+                            }
+                            <span>
+                                <input type="checkbox" name="cookingStyle" id="style-@cs.pkCookingStyleId" class="cookingStyle" value="@cs.pkCookingStyleId" title="@cs.Name" @isChecked />
+                                <label for="style-@cs.pkCookingStyleId">@cs.Name</label>
+                            </span>
+                        }}
+                    </p>
+                </fieldset>
+                        
+            </li>
+
+            <li id="tags" class="tags">
+                <p class="bold">"Tag" the roll: </p>
+                <p class="error">@Html.ValidationMessage("tags")</p>
+
+                <fieldset>
+                    <legend>Tags</legend>
+                    <p>
+                        @{foreach(Tag t in _common.getAllTags()){
+                            string isChecked = "";
+                            foreach(var x in currentItem.Tags){
+                                if (x.pkTagId == t.pkTagId){isChecked = "checked";}
+                            }
+                            <span>
+                                <input type="checkbox" name="tags" id="tag-@t.pkTagId" class="tag" value="@t.pkTagId" title="@t.TagName" @isChecked />
+                                <label for="tag-@t.pkTagId">@t.TagName</label>
+                            </span>
+                        }}
+                    </p>
+                </fieldset>
+                        
+            </li>
+        </ul>
+
+        <ul>
+            <li>
+                <label for="pPrice">Price:</label>
+                <input type="text" id="pPrice" name="pPrice" class="price" value="@string.Format("{0:c}", currentItem.Price)" @Validation.For("pPrice") />
+                <div>@Html.ValidationMessage("pPrice")</div>
+            </li> 
+            <li><header><h3>Images</h3><small>(Images should be located at "/images/sushi/")</small></header></li>
+            <li>
+                <label for="pimgURL">Image URL:</label>
+                <input type="text" id="pimgURL" name="pimgURL" class="desc" value="@currentItem.imgURL" /> <small>(250x250px)</small>
+            </li>
+
+            <li>
+                <label for="pimgThumbURL">Thumbnail:</label>
+                <input type="text" id="pimgThumbURL" name="pimgThumbURL" class="desc" value="@currentItem.imgThumbURL" /> <small>(100x100px)</small>
+            </li>
+
+            <li>
+                <label for="pimgSpURL">Special URL:</label>
+                <input type="text" id="pimgSpURL" name="pimgSpURL" class="desc" value="@currentItem.imgSpUrL" /> <small>(1000x400px)</small>
+            </li>
+
+            <li class="actions">
+                <input type="submit" value="@{if(hasId){<text>Save Changes</text>}else{<text>Add New</text>}}" />
+                <button formaction="~/admin/manageSushi">Cancel</button>
+                @if(Roles.IsUserInRole("Master") && hasId){<button formaction="~/admin/deleteSushiConfirm/@id" class="deleteButton">Delete</button>}
+            </li>
+        </ul>
+    </form>
+</section>

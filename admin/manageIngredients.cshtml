@@ -1,0 +1,39 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Manage Ingredients";
+
+    var ingredients = _common.getAllIngredients();
+
+    var ingGrid = new WebGrid(source: ingredients,
+                                defaultSort: "Name",
+                                rowsPerPage: 30);
+}
+
+<section id="manageIngredients">
+    <header>
+        <h3><a href="~/admin" class="arrow">&larr;</a>Manage Ingredients <small><a href="~/admin/modifyIngredient/">Add New</a></small></h3>
+    </header>
+
+    @ingGrid.GetHtml(
+        tableStyle: "webGrid",
+        headerStyle: "head",
+        alternatingRowStyle: "alt",
+        columns: ingGrid.Columns(
+                                ingGrid.Column("IngredientName", "Name", style: "name"),
+                                ingGrid.Column("IngredientAltName", "Alt Name"),
+                                ingGrid.Column("Description"),
+                                ingGrid.Column("IGroup.GroupName", "Group"),
+                                ingGrid.Column("IngredientPricePerRoll", "Price",
+                                    format: @<text>@String.Format("{0:C}", item.IngredientPricePerRoll)</text>),
+                                ingGrid.Column("Active"),
+                                ingGrid.Column(
+                                    style: "options",
+                                    format:
+                                        @<text>
+                                            <a href="~/admin/modifyIngredient/@item.pkIngredientId">Edit</a>
+                                        </text>)
+        )
+    )
+
+
+</section>

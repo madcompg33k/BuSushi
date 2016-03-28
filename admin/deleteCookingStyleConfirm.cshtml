@@ -1,0 +1,52 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Delete Cooking Style";
+
+    if (!Roles.IsUserInRole("Master")){
+        Response.Redirect("~/");
+    }
+
+    var id = UrlData[0].AsInt();
+    
+    CookingStyle currentItem = new CookingStyle();
+    
+    if(id != null){currentItem = _common.getCookingStyleById(id);}
+    else{Response.Redirect("~/admin/");}
+
+    var db = Database.Open("buSushi");
+    var sql = db.Query(@"SELECT p.Name
+                            FROM CookingStyles cs
+                            INNER JOIN CookingStyleLookup csl
+                            ON csl.fkCookingStyleId = cs.pkCookingStyleId
+                            INNER JOIN Rolls r
+                            ON r.pkRollId = csl.fkRollId
+                            LEFT JOIN Products p
+                            ON p.pkId = r.fkProductId
+                            WHERE csl.fkCookingStyleId = @0", id);
+}
+    
+
+<section id="deleteTag">
+    <header>
+        <h3>@Page.Title (@currentItem.Name)</h3>
+    </header>
+
+    @if(sql.Count() > 0){
+        <h2>You may not delete this style, it is referenced by other items.</h2>
+        <p>Items referencing this style:</p>
+        <ul>
+            @foreach(var item in sql){
+                <li>@item.Name</li>
+            }
+        </ul>
+        <a href="~/admin/">&larr; Go Back</a>
+    }else{
+        <form id="frmDelete" method="delete" action="~/admin/deleteCookingStyle/@id">
+            <h2>Are you sure you want to delete @currentItem.Name? (ID: @currentItem.pkCookingStyleId)</h2>
+            <small>(This action is irreversible)</small>
+
+            <input type="submit" value="Yes" />
+            <button formaction="~/admin/">No</button>
+        </form>
+    }
+</section>

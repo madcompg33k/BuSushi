@@ -1,0 +1,254 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "View Customer";
+
+    /* Check for Master-level role, admins cannot modify users */
+    if(!(Roles.IsUserInRole("Administrator") || Roles.IsUserInRole("Master"))){Response.Redirect("~/admin/");}
+
+    var CustomerId = UrlData[0].AsInt();
+    var hasId = !string.IsNullOrEmpty(UrlData[0]);
+
+    Customer customer;
+    
+    if(hasId){
+        customer = new Customer(CustomerId);
+    } else{
+        customer = null;
+        Response.Redirect("~/admin/");
+    }
+
+
+    var db = Database.Open("buSushi");
+    
+    var statusList = db.Query("SELECT DISTINCT pkUserStatusId, Status FROM UserStatus")
+                            .Select(type => new SelectListItem {
+                                Value = type.pkUserStatusId.ToString(),
+                                Text = type.Status
+                            });
+    
+    var phoneTypeList = db.Query("SELECT DISTINCT pkPhoneTypeId, PhoneType FROM PhoneTypes")
+                            .Select(type => new SelectListItem {
+                                Value = type.pkPhoneTypeId.ToString(),
+                                Text = type.PhoneType
+                            });
+
+    // Setup validation
+    
+    if (IsPost && Validation.IsValid()) {
+        customer.UStatus = new UserStatus(Request["UStatus"].AsInt());
+        customer.isConfirmed = Request["isConfirmed"] == "on" ? true : false;
+        customer.MilitaryVerified = Request["confirmedMilitary"] == "on" ? true : false;
+
+        customer.updateUserStatus();
+        customer.updateMilitaryStatus();
+    }
+}
+    
+
+<section id="viewCustomer">
+    <header>
+        <h3><a href="~/admin/manageCustomers" class="arrow">&larr;</a> View Customer</h3>
+    </header>
+
+    <input type="hidden" id="cId" name="cId" value="@customer.pkCustomerId" />
+    <input type="hidden" id="uId" name="uId" value="@customer.UserId" />
+        
+    <ul>
+        <li>
+            <span class="bold">Username:</span> <span>@customer.Username</span> <span>(@customer.UserId)</span>
+        </li>
+
+        <li>
+            <span class="bold">E-Mail:</span> <span>@customer.Email</span>
+        </li>
+
+        <li>
+            <span class="bold">Name:</span> <span>@customer.FName @customer.LName</span>
+        </li>
+
+        <li>
+            <form method="post">
+                <label for="UStatus">User Status:</label>
+                @Html.DropDownList("UStatus", null, statusList, customer.UStatus.pkUserStatusId, new {@class="productField", name="UStatus"})
+                <br />
+                <input type="checkbox" id="isConfirmed" name="isConfirmed" checked="@customer.isConfirmed" />Confirmed?
+                <br />
+                <input type="checkbox" id="confirmedMilitary" name="confirmedMilitary" checked="@customer.MilitaryVerified" />Verified Military?
+                <br />
+                <input type="submit" value="Update" />
+                @if(customer.UStatus.Status != "Active"){<button formaction="~/admin/activateUser/@customer.UserId">Activate</button>}
+            </form>
+        </li>
+
+        <li>
+            <header>Roles:</header>
+            <ul>
+                @foreach(var item in Roles.GetAllRoles()){
+                    <li>
+                        @if(Roles.IsUserInRole(customer.Username, item)){
+                            <span class="bold">@item</span>
+
+                            if(customer.UserId != WebSecurity.CurrentUserId){
+                                if(string.Equals(item, "Master") && Roles.IsUserInRole("Master")){
+                                    if(!string.Equals(customer.Username, "baudsmui")){
+                                        <a href="~/admin/removeUserFromRole/@customer.UserId/@item/" class="aOption remove">Remove Role</a>
+                                    } else{<span class="aOption">You cannot take the owner of the company out of the "Master" role</span>}
+                                } else if (!string.Equals(item, "Master")){
+                                    <a href="~/admin/removeUserFromRole/@customer.UserId/@item/" class="aOption remove">Remove Role</a>
+                                }
+                            } else{
+                                if(string.Equals(item, "Master")){
+                                    <span class="aOption">You cannot take yourself out of the "Master" role</span>
+                                } else{
+                                    <a href="~/admin/removeUserFromRole/@customer.UserId/@item/" class="aOption remove">Remove Role</a>
+                                }
+                            }
+                        } else{
+                            <span>@item</span>
+                            
+                            if(customer.UserId != WebSecurity.CurrentUserId){
+                                if(string.Equals(item, "Master") && Roles.IsUserInRole("Master")){
+                                    <a href="~/admin/addUserToRole/@customer.UserId/@item/" class="aOption add">Add Role</a>
+                                } else if (!string.Equals(item, "Master")){
+                                    <a href="~/admin/addUserToRole/@customer.UserId/@item/" class="aOption add">Add Role</a>
+                                }
+                            } else{
+                                if(string.Equals(customer.Username, "baudsmui")){
+                                    <a href="~/admin/addUserToRole/@customer.UserId/@item/" class="aOption add">Add Role</a>
+                                }
+                            }
+                        }
+                        @*
+                        <span @if(Roles.IsUserInRole(customer.Username, item)){<text>class="bold"</text>}>@item</span>
+                        @if(Roles.IsUserInRole(customer.Username, item) && customer.UserId != WebSecurity.CurrentUserId){
+                            <a href="~/admin/removeUserFromRole/@customer.UserId/@item/" class="aOption remove">Remove Role</a>
+                        } else if (!Roles.IsUserInRole(customer.Username, item) && customer.UserId != WebSecurity.CurrentUserId){
+                            <a href="~/admin/addUserToRole/@customer.UserId/@item/" class="aOption add">Add Role</a>
+                        }
+                        else{
+                            if((!string.Equals(item, "Master") && (Roles.IsUserInRole("Master"))
+                                || !Roles.IsUserInRole("Master"))){
+                                <a href="~/admin/removeUserFromRole/@customer.UserId/@item/" class="aOption remove">Remove Role</a>
+                            } else{<span class="aOption">You cannot take yourself out of the 'Master' role</span>}
+                        }*@
+                    </li>
+                }
+            </ul>
+        </li>
+    </ul>
+
+    <ul>
+        <li class="phone">
+            <span class="bold">Phone (Primary):</span>
+            @if(string.IsNullOrEmpty(customer.PhoneMain)){<span class="italic">(none)</span>}
+            else{
+                <span>@customer.PhoneMain</span>
+                <span class="bold">Ext:</span> <span>@customer.PhoneMainExt</span>
+                <span class="bold">Type:</span> <span>@customer.PhoneMainType.PhoneTypeName</span>
+            }
+        </li>
+
+        <li class="phone">
+            <span class="bold">Phone (Secondary):</span>
+            @if(string.IsNullOrEmpty(customer.PhoneSecondary)){<span class="italic">(none)</span>}
+            else{
+                <span>@customer.PhoneSecondary</span>
+                <span class="bold">Ext:</span> <span>@customer.PhoneSecondaryExt</span>
+                <span class="bold">Type:</span> <span>@customer.PhoneSecondaryType.PhoneTypeName</span>
+            }
+        </li>
+    </ul>
+
+    <ul>
+        <li><h3>Addresses</h3></li>  
+        @if(customer.Addresses.Count > 0){
+            foreach(var item in customer.Addresses){
+                <li class="address">
+                    <p class="an">@item.Nickname</p>
+                    <p class="addr">
+                        <span class="street-address">@item.Address1</span>
+                        <br />
+                        @if(!string.IsNullOrEmpty(item.Address2)){
+                            <span class="street-address">@item.Address2</span>
+                            <br />
+                        }
+                        <span class="city">@item.AddrCity.CityName</span>
+                        <br />
+                        <span class="state">@item.AddrCity.CState.StateName</span>
+                        <br />
+                        <span class="zip">@item.AddrCity.ZipCode</span>
+                        <br />
+                        <span class="instructions">@item.SpInstructions</span>
+                    </p>
+                        
+                    <input type="checkbox" id="isPrimary" name="isPrimary" checked="@item.isPrimary" disabled />Primary?
+                    &nbsp;
+                    <input type="checkbox" id="isBilling" name="isBilling" checked="@item.isBilling" disabled />Billing?
+                    
+                </li>
+            }
+        } else{<li><span>(none)</span></li>}
+    </ul>
+
+    <ul>
+        <li><header><h4>Customer Rolls</h4></header></li>
+        @if(customer.Rolls.Count > 0){
+            foreach(var item in customer.Rolls){
+                <li>
+                    <ul>
+                        <li><a href="@Href("~/admin/viewCustomerRoll",item.pkCustomerRollId)">@item.RollName</a></li>
+                        <li>
+                                <p class="title">Ingredients (Top)</p>
+                                @if(item.IngredientsTop.Count > 0){
+                                    foreach(var ing in item.IngredientsTop){
+                                        <p class="detail">@ing.IngredientName @if(!string.IsNullOrEmpty(ing.IngredientAltName)){<text>(@ing.IngredientAltName)</text>}</p>
+                                    }
+                                } else{<p class="detail">(none)</p>}
+                        </li>
+                        <li>
+                                <p class="title">Ingredients (Inside)</p>
+                                @if(item.IngredientsInside.Count > 0){
+                                    foreach(var ing in item.IngredientsInside){
+                                        <p class="detail">@ing.IngredientName @if(!string.IsNullOrEmpty(ing.IngredientAltName)){<text>(@ing.IngredientAltName)</text>}</p>
+                                    }
+                                } else{<p class="detail">(none)</p>}
+                        </li>
+                        <li>
+                                <p class="title">Cooking Styles</p>
+                                @if(item.CookingStyles.Count > 0){
+                                    foreach(var cs in item.CookingStyles){
+                                        <p class="detail">@cs.Name</p>
+                                    }
+                                } else{<p class="detail">(none)</p>}
+                        </li>
+                        <li>
+                                <p class="title">Tags</p>
+                                @if(item.Tags.Count > 0){
+                                    foreach(var tags in item.Tags){
+                                        <p class="detail">@tags.TagName</p>
+                                    }
+                                } else{<p class="detail">(none)</p>}
+                        </li>
+                    </ul>
+                </li>
+            }
+        } else{<li>(none)</li>}
+    </ul>
+
+    <ul>
+        <li class="actions">
+            <form id="frmModify" action="" method="post">
+                <button formaction="~/admin/manageCustomers">Back</button>
+                @if(customer.UserId != WebSecurity.CurrentUserId && !string.Equals(customer.Username, "baudsmui")){
+                    if(Roles.IsUserInRole("Master") && hasId && customer.UStatus.Status != "Banned"){
+                        <button formaction="~/admin/banUserConfirm/@customer.UserId" class="deleteButton">Ban User</button>
+                    }
+                    if(Roles.IsUserInRole("Master") && hasId){
+                        <button formaction="~/admin/deleteCustomerConfirm/@customer.UserId" class="deleteButton">Delete</button>
+                    }
+                }
+            </form>
+        </li>
+    </ul>
+    </form>
+</section>

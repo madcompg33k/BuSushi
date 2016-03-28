@@ -1,0 +1,27 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Ban User";
+
+    var id = UrlData[0].AsInt();
+    var isDeleted = false;
+
+    Customer currentItem = null;
+
+    if(id != null){
+        currentItem = new Customer(id);
+        currentItem.banUser();
+        isDeleted = true;
+    }
+    else{Response.Redirect("~/admin/");}
+
+}
+
+<section id="itemDeleted">
+    @if(isDeleted){
+        <header><h3>@currentItem.Username banned!</h3></header>
+        <p>@currentItem.Username has been banned. (<a href="~/admin/activateUser/@currentItem.UserId">Undo</a>)</p>
+        <p><a href="~/admin/viewCustomer/@currentItem.UserId">Return</a></p>
+    } else{
+        <text>There has been an error, please try again.</text>
+    }
+</section>

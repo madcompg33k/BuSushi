@@ -1,0 +1,16 @@
+﻿@{
+    if (!Roles.IsUserInRole("Master")){Response.Redirect("~/");}
+    var id = UrlData[0].AsInt();
+
+    Ingredient currentItem;
+
+    if(id != null){
+        currentItem = new Ingredient(id);
+        currentItem.deleteIngredient();
+        Response.Redirect(Href("~/admin/deleteComplete", true, "ingredients"));
+    }
+    else{
+        currentItem = new Ingredient();
+        Response.Redirect(Href("~/admin/deleteComplete", false, "ingredients"));
+    }
+}

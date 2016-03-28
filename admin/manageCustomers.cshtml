@@ -1,0 +1,66 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Manage Customers";
+
+    List<Customer> customers = _common.getAllCustomers();
+
+    var gridCustomers = new WebGrid(source: customers,
+                                defaultSort: "Name",
+                                rowsPerPage: 30);
+    
+}
+
+<script type="text/javascript">
+    $(function () {
+        $('span.user-status')
+            .filter(function () { return $(this).text() == 'Banned'; })
+            .parent("td").parent("tr").css('background-color', '#f33');
+    });
+</script>
+
+<section id="manageCustomers">
+    <header>
+        <h3><a href="~/admin" class="arrow">&larr;</a>@Page.Title <small><a href="~/admin/modifyIngredient/">Add New</a></small></h3>
+    </header>
+
+    @gridCustomers.GetHtml(
+        tableStyle: "webGrid",
+        headerStyle: "head",
+        alternatingRowStyle: "alt",
+        columns: gridCustomers.Columns(
+            gridCustomers.Column("pkCustomerId", "Customer Id"),
+            gridCustomers.Column("UserId", "User Id"),
+            gridCustomers.Column("Username", "Username"),
+            gridCustomers.Column("FName", "First Name"),
+            gridCustomers.Column("LName", "Last Name"),
+            gridCustomers.Column("", "Roles", format:(item)=>{
+                WebGrid subGrid = new WebGrid(source: item.Roles);
+                return subGrid.GetHtml(
+                    htmlAttributes: new { @class="subT"},
+                    columns: subGrid.Columns(
+                        subGrid.Column("RoleName", "", canSort: false)
+                    )
+                );
+            }),
+            gridCustomers.Column("isConfirmed", "Confirmed"),
+            gridCustomers.Column("UStatus.Status", "Status",
+                                format:
+                                @<text>
+                                    <span class="user-status">@item.UStatus.Status</span>
+                                </text>),
+            gridCustomers.Column(
+                style: "options",
+                format:
+                    @<text>
+                        <a href="~/admin/viewCustomer/@item.UserId">View</a>
+                        @if(Roles.IsUserInRole("Master") && item.UserId != WebSecurity.CurrentUserId && !string.Equals(item.Username, "baudsmui")){
+                            if(string.Equals(item.UStatus.Status, "Banned")){<a href="~/admin/activateUser/@item.UserId">Un-Ban</a>}
+                            else{<a href="~/admin/banUserConfirm/@item.UserId">Ban</a>}
+                        }
+                    </text>
+            )
+        )
+    )
+
+
+</section>

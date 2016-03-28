@@ -1,0 +1,74 @@
+﻿@{
+    Layout = "~/_SiteLayout.cshtml";
+    Page.Title = "Alert Me";
+
+
+    var userId = WebSecurity.CurrentUserId;
+
+    var db = Database.Open("buSushi");
+    var hasAlert = db.QueryValue("SELECT pkDeliveryReadyAlertId from DeliveryReadyAlert WHERE fkUserId = @0", userId) == null ? false : true;
+    db.Close();
+}
+
+
+<section id="setupAlert">
+    <header><h3>Delivery Alert</h3></header>
+    <article>
+        We're sorry, but we're not quite ready to deliver yet,
+        <br />
+        however, your cart will be saved and ready for you when we are.
+        <br /><br />
+        @{
+            if (hasAlert){
+                <text>
+                    If you'd like, please add your name and e-mail to our list
+                    and we'll let you know as soon as we're delivery so you can be
+                    one of the first to get our sushi!
+                    <br />
+                    <form method="post" action="~/addDeliveryAlert/">
+                        <ul>
+                            <li>
+                                <label for="fName">First Name:</label>
+                                <input type="text" id="fName" name="fName" />
+                            </li>
+
+                            <li>
+                                <label for="lName">Last Name:</label>
+                                <input type="text" id="lName" name="lName" />
+                            </li>
+
+                            <li>
+                                <label for="phone">Phone #:</label>
+                                <input type="text" id="phone" name="phone" />
+                            </li>
+
+                            <li>
+                                <label for="email">E-Mail:</label>
+                                <input type="text" id="email" name="email" />
+                            </li>
+
+                            <li>
+                                <label for="contactMethod">Contact Method:</label>
+                                <select id="contactMethod" name="contactMethod">
+                                    <option id="email">E-Mail</option>
+                                    <option id="text">Text</option>
+                                    <option id="call">Call</option>
+                                </select>
+                            </li>
+
+                            <li class="actions">
+                                <input type="submit" value="Add to List" />
+                            </li>
+                        </ul>
+                    </form>
+                </text>
+            } else{
+                <text>
+                    You've already got an alert setup with us, so just keep an eye on whatever
+                    contact method you requested we use and we'll let you know as soon as we're
+                    ready to start delivery! Thank you for your patience!
+                </text>
+            }
+        }
+    </article>
+</section>

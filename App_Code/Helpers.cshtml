@@ -1,0 +1,405 @@
+﻿@helper OrderedList(IEnumerable<string> items){
+    <ol>
+        @foreach(var item in items){<li>@item</li>}
+    </ol>
+}
+
+@helper noUser(string message){
+    <span class="error">
+        You must be logged in to @message.
+    </span>
+    <br />
+    <a href="~/account/login">Log In</a>@*<!-- text> or </text><a href="~/Account/Register">Register</a><text> for free.</text -->*@
+}
+
+@helper showProduct(Product p){
+    if(p.discontinued && (Roles.IsUserInRole("Administrator") || Roles.IsUserInRole("Master")))
+    {
+        <div class="discontinued @if(p.isSpecial()){<text>product-special</text>;}">
+            <img src="@p.imgThumbURL" alt="@p.Name" />
+            <aside>
+                <form method="post">
+                    <strong>
+                        @{
+                            if(p.JPName != null){
+                                <a href="@Href("~/productDetails", p.pkProductId, p.JPName.Replace(" ", string.Empty))">@p.JPName</a>
+                                <span class="jpName">(@p.Name)</span>
+                            }else{<a href="@Href("~/productDetails", p.pkProductId, p.Name.Replace(" ", string.Empty))">@p.Name</a>}
+                            if(p.isSpecial()){<span class="special-text">(Special)</span>}
+                        }
+                    </strong>
+                    @if(Roles.IsUserInRole("Administrator") || Roles.IsUserInRole("Master")){
+                        <a href="@Href("~/admin/modifyProduct", p.pkProductId)" class="edit">(Edit)</a>
+                    }
+                    <br />
+                    <span class="price">
+                        @{
+                            Discount disc = _common.getDiscountByCode("SPECIAL");
+                            disc.getDiscountDollar(p.Price);
+
+                            if(string.Equals(_common.getItemTypeByProductId(p.pkProductId), "Roll")){
+                                Roll r =_common.getRollProduct(p.pkProductId);
+                                foreach(OrderOption op in r.Options){p.Price += op.OptionPrice;}
+                            }
+                        
+                            <text>
+                                @if(p.isSpecial()){
+                                    <span class="price strikethrough">@String.Format("{0:C}", p.Price)</span>
+                                    <span class="price">@String.Format("{0:C}", p.Price - disc.DiscountDollar)</span>
+                                }else{<span>@String.Format("{0:C}", p.Price)</span>}
+                            </text>
+                        }
+                    
+                    </span>
+                    @if(WebSecurity.CurrentUserId != -1){<input type="submit" class="quick-add-button" value="Quick Add" />}
+                    <br />
+                    <span class="desc">@p.Description</span>
+                    <div>
+                    @foreach(var t in p.Tags){
+                        <a href="@Href("~/products", t.TagName)" class="tag">@t.TagName</a>
+                    }
+                    </div>
+                    <input type="hidden" id="@p.pkProductId" name="productId" value="@p.pkProductId" />
+                </form>
+            </aside>
+        </div>
+    } else if(!p.discontinued){
+        <div @if(p.isSpecial()){<text>class="product-special"</text>;}>
+        <img src="@p.imgThumbURL" alt="@p.Name" />
+        <aside>
+            <form method="post">
+                <strong>
+                    @{
+                        if(p.JPName != null){
+                            <a href="@Href("~/productDetails", p.pkProductId, p.JPName.Replace(" ", string.Empty))">@p.JPName</a>
+                            <span class="jpName">(@p.Name)</span>
+                        }else{<a href="@Href("~/productDetails", p.pkProductId, p.Name.Replace(" ", string.Empty))">@p.Name</a>}
+                        if(p.isSpecial()){<span class="special-text">(Special)</span>}
+                    }
+                </strong>
+                @if(Roles.IsUserInRole("Administrator") || Roles.IsUserInRole("Master")){
+                    <a href="@Href("~/admin/modifyProduct", p.pkProductId)" class="edit">(Edit)</a>
+                }
+                <br />
+                <span class="price">
+                    @{
+                        Discount disc = _common.getDiscountByCode("SPECIAL");
+                        disc.getDiscountDollar(p.Price);
+
+                        if(string.Equals(_common.getItemTypeByProductId(p.pkProductId), "Roll")){
+                            Roll r =_common.getRollProduct(p.pkProductId);
+                            foreach(OrderOption op in r.Options){p.Price += op.OptionPrice;}
+                        }
+                        
+                        <text>
+                            @if(p.isSpecial()){
+                                <span class="price strikethrough">@String.Format("{0:C}", p.Price)</span>
+                                <span class="price">@String.Format("{0:C}", p.Price - disc.DiscountDollar)</span>
+                            }else{<span>@String.Format("{0:C}", p.Price)</span>}
+                        </text>
+                    }
+                    
+                </span>
+                @if(WebSecurity.CurrentUserId != -1){<input type="submit" class="quick-add-button" value="Quick Add" />}
+                <br />
+                <span class="desc">@p.Description</span>
+                <div>
+                @foreach(var t in p.Tags){
+                    <a href="@Href("~/products", t.TagName)" class="tag">@t.TagName</a>
+                }
+                </div>
+                <input type="hidden" id="@p.pkProductId" name="productId" value="@p.pkProductId" />
+            </form>
+        </aside>
+    </div>
+    }
+}
+
+
+
+@helper productTypes(int Id){
+    var typeList = _common.getProductTypes()
+                        .Select(type => new SelectListItem {
+                            Value = type.pkProductTypeId.ToString(),
+                            Text = type.ProductTypeName
+                        });
+    <label for="pType">Product Type:</label>
+    @Html.DropDownList("pType",  "-select-", typeList, Id, new {@class="productField", name="pType"})
+}
+
+@helper foodTypes(int Id){
+    var foodTypeList = _common.getFoodTypes()
+                        .Select(type => new SelectListItem {
+                            Value = type.pkFoodTypeId.ToString(),
+                            Text = type.FoodTypeName
+                        });
+    <label for="fType">Food Type:</label>
+    @Html.DropDownList("fType",  "-select-", foodTypeList, Id, new {@class="productField", name="fType"})
+}
+
+@helper sushiTypes(int Id){
+    var sushiTypeList = _common.getSushiTypes()
+                        .Select(type => new SelectListItem {
+                            Value = type.pkSushiTypeId.ToString(),
+                            Text = type.SushiTypeName
+                        });
+    <label for="sType">Sushi Type:</label>
+    @Html.DropDownList("sType", "-select-", sushiTypeList, Id, new {@class="productField", name="sType"})
+}
+
+
+@helper rollTypes(int Id){
+    var rollTypeList = _common.getRollTypes()
+                        .Select(type => new SelectListItem {
+                            Value = type.pkRollTypeId.ToString(),
+                            Text = type.RollTypeName
+                        });
+    <label for="rType">Roll Type:</label>
+    @Html.DropDownList("rType", "-select-", rollTypeList, Id, new {@class="productField", name="rType"})
+}
+
+@helper discountTypes(int Id){
+    var typeList = _common.getDiscountTypes()
+                    .Select(type => new SelectListItem {
+                        Value = type.pkDiscountTypeId.ToString(),
+                        Text = type.DiscountTypeName
+                    });
+    <label for="dType">Discount Type:</label>
+    @Html.DropDownList("dType", "-select-", typeList, Id, new {@class="productField", name="dType"})
+}
+
+@helper roleTypes(int Id){
+    var typeList = _common.getAllRoles()
+                    .Select(type => new SelectListItem {
+                        Value = type.RoleId.ToString(),
+                        Text = type.RoleName
+                    });
+    <label for="role">Role:</label>
+    @Html.DropDownList("role", "-select-", typeList, Id, new {@class="customerField", name="role"})
+}
+
+
+
+@helper cities(City currentItem){
+    var cityList = _common.getCities()
+                        .Select(type => new SelectListItem {
+                            Value = type.pkCityId.ToString(),
+                            Text = type.CityName
+                        });
+    <label for="city">City:</label>
+    @Html.DropDownList("city",  "-select a city-", cityList, currentItem.pkCityId, new {@class="addressField", name="city"})
+}
+
+@helper states(int selected){
+    var statesList = _common.getStates()
+                        .Select(type => new SelectListItem {
+                            Value = type.pkStateId.ToString(),
+                            Text = type.StateAbbreviation
+                        });
+    <label for="state">State: </label>
+    @Html.DropDownList("state",  "-select-", statesList, selected, new {@class="addressField", name="state"})
+}
+
+@helper phoneTypes(string id, int selected){
+    var phoneTypes = _common.getAllPhoneTypes()
+                        .Select(type => new SelectListItem {
+                            Value = type.pkPhoneTypeId.ToString(),
+                            Text = type.PhoneTypeName
+                        });
+    <label class="phone-type">Type: </label>
+    @Html.DropDownList(id, "-select-", phoneTypes, selected, new {@class="phone-type", name=id})
+}
+
+
+@helper topIngredientCheckboxes(){
+    foreach(IngredientGroup ig in _common.getIngredientGroups()){
+        List<Ingredient> ingredientsInGroup = _common.getTopIngredientsInGroup(ig.pkGroupId);
+        if(ingredientsInGroup.Count() < 1){continue;}
+        <fieldset>
+            <legend>@ig.GroupName</legend>
+            <p>
+                @foreach(Ingredient i in ingredientsInGroup){
+                    <span>
+                        <input type="checkbox" name="onTop" id="top-@i.pkIngredientId" class="topIngredient" value="@i.pkIngredientId"
+                                title="@i.IngredientAltName - @i.Description" />
+                        <label for="top-@i.pkIngredientId">@i.IngredientName</label>
+                        <input type="hidden" id='top-@i.pkIngredientId-Price' class="ingredient-price" value="@i.IngredientPricePerRoll " />
+                        <input type="hidden" id="top-@i.pkIngredientId-Group" class="group" value="@i.IGroup.GroupName" />
+                    </span>
+                }
+            </p>
+        </fieldset>
+    }
+}
+
+@helper topIngredientCheckboxes(Roll currentItem){
+    foreach(IngredientGroup ig in _common.getIngredientGroups()){
+        List<Ingredient> ingredientsInGroup = _common.getTopIngredientsInGroup(ig.pkGroupId);
+        if(ingredientsInGroup.Count() < 1){continue;}
+        <fieldset>
+            <legend>@ig.GroupName</legend>
+            <p>
+                @foreach(Ingredient i in ingredientsInGroup){
+                    string isChecked = "";
+                    <span>
+                        @{
+                            foreach(var x in currentItem.SecondaryIngredients){
+                                if (x.pkIngredientId == i.pkIngredientId){isChecked = "checked"; continue;}
+                            }
+                        }
+                        <input type="checkbox" name="onTop" id="top-@i.pkIngredientId" class="topIngredient" value="@i.pkIngredientId"
+                                title="@i.IngredientAltName - @i.Description" @isChecked />
+                        <label for="top-@i.pkIngredientId">@i.IngredientName</label>
+                        <input type="hidden" id='top-@i.pkIngredientId-Price' class="ingredient-price" value="@i.IngredientPricePerRoll " />
+                        <input type="hidden" id="top-@i.pkIngredientId-Group" class="group" value="@i.IGroup.GroupName" />
+                    </span>
+                }
+            </p>
+        </fieldset>
+    }
+}
+
+@helper IngredientCheckboxes(){
+    foreach(IngredientGroup ig in _common.getIngredientGroups()){
+        List<Ingredient> ingredientsInGroup = _common.getAllIngredientsInGroup(ig.pkGroupId);
+        if(ingredientsInGroup.Count() < 1){continue;}
+
+        <fieldset>
+            <legend>@ig.GroupName</legend>
+            <p>
+            @foreach(Ingredient i in ingredientsInGroup){
+                <span>
+                    <input type="checkbox" name="inside" id="in-@i.pkIngredientId" class="insideIngredient" value="@i.pkIngredientId"
+                            title="@i.IngredientAltName - @i.Description" />
+                    <label for="in-@i.pkIngredientId">@i.IngredientName</label>
+                    <input type="hidden" id='in-@i.pkIngredientId-Price' class="ingredient-price" value="@i.IngredientPricePerRoll" />
+                    <input type="hidden" id="in-@i.pkIngredientId-Group" class="group" value="@i.IGroup.GroupName" />
+                </span>
+            }
+            </p>
+        </fieldset>
+    }
+}
+
+@helper IngredientCheckboxes(Food currentItem){
+    foreach(IngredientGroup ig in _common.getIngredientGroups()){
+        List<Ingredient> ingredientsInGroup = _common.getAllIngredientsInGroup(ig.pkGroupId);
+        if(ingredientsInGroup.Count() < 1){continue;}
+
+        <fieldset>
+            <legend>@ig.GroupName</legend>
+            <p>
+            @foreach(Ingredient i in ingredientsInGroup){
+                string isChecked = "";
+                <span>
+                    @{
+                        foreach(var x in ((Food)currentItem).Ingredients){
+                            if (x.pkIngredientId == i.pkIngredientId){isChecked = "checked"; continue;}
+                        }
+                    }
+                    <input type="checkbox" name="inside" id="in-@i.pkIngredientId" class="insideIngredient" value="@i.pkIngredientId"
+                            title="@i.IngredientAltName - @i.Description" @isChecked />
+                    <label for="in-@i.pkIngredientId">@i.IngredientName</label>
+                    <input type="hidden" id='in-@i.pkIngredientId-Price' class="ingredient-price" value="@i.IngredientPricePerRoll" />
+                    <input type="hidden" id="in-@i.pkIngredientId-Group" class="group" value="@i.IGroup.GroupName" />
+                </span>
+            }
+            </p>
+        </fieldset>
+    }
+}
+
+@helper OptionCheckboxes(){
+    <p>
+        @foreach(OrderOption option in _common.getAllOrderOptions()){
+            <span>
+                <input type="checkbox" id="@option.pkOptionId" name="rollOptions" class="roll-option" value="@option.pkOptionId"  />
+                <label for="@option.pkOptionId">@option.OptionName ($@option.OptionPrice/ea)</label>
+                <input type="hidden" class="option-id" value="@option.pkOptionId" />
+                <input type="hidden" class="option-name" value="@option.OptionName" />
+                <input type="hidden" class="option-price" value="@option.OptionPrice" />
+            </span>
+        }
+    </p>
+}
+
+@helper OptionCheckboxes(Roll currentItem){
+    <p>
+        @foreach(OrderOption option in _common.getAllOrderOptions()){
+            string isChecked = "";
+            foreach(var x in currentItem.Options){if(x.pkOptionId == option.pkOptionId){isChecked = "checked"; continue;}}
+            <span>
+                <input type="checkbox" id="@option.pkOptionId" name="rollOptions" class="roll-option" value="@option.pkOptionId" @isChecked />
+                <label for="@option.pkOptionId">@option.OptionName (@String.Format("{0:C}", option.OptionPrice)/ea)</label>
+                <input type="hidden" class="option-id" value="@option.pkOptionId" />
+                <input type="hidden" class="option-name" value="@option.OptionName" />
+                <input type="hidden" class="option-price" value="@option.OptionPrice" />
+            </span>
+        }
+    </p>
+}
+
+
+
+@helper ProductOptionGroups(int Id){
+    var groupList = _common.getAllProductOptionsGroups()
+                        .Select(type => new SelectListItem {
+                            Value = type.pkProductOptionGroupId.ToString(),
+                            Text = type.GroupName
+                        });
+    <label for="oGroup">Product Option Group:</label>
+    @Html.DropDownList("oGroup",  "-select-", groupList, Id, new {@class="productField", name="oGroup"})
+}
+
+@helper ProductOptionCheckboxes(){
+    <p>
+        @foreach(ProductOption option in _common.getAllProductOptions()){
+            <span>
+                <input type="checkbox" id="@option.pkProductOptionId" name="pOptions" class="product-option" value="@option.pkProductOptionId"  />
+                <label for="@option.pkProductOptionId">@option.OptionName</label>
+            </span>
+        }
+    </p>
+}
+
+@helper ProductOptionCheckboxes(Product currentItem){
+    <p>
+        @foreach(ProductOption option in _common.getAllProductOptions()){
+            string isChecked = "";
+            foreach(var x in currentItem.ProductOptions){if(x.pkProductOptionId == option.pkProductOptionId){isChecked =  "checked"; continue;}}
+            <span>
+                <input type="checkbox" id="@option.pkProductOptionId" name="pOptions" class="product-option" value="@option.pkProductOptionId" @isChecked />
+                <label for="@option.pkProductOptionId">@option.OptionName</label>
+                <input type="hidden" class="option-id" value="@option.pkProductOptionId" />
+                <input type="hidden" class="option-name" value="@option.OptionName" />
+            </span>
+        }
+    </p>
+}
+
+@helper ProductOptions(Product currentItem){
+    var optionList = currentItem.ProductOptions
+                        .Select(type => new SelectListItem {
+                            Value = type.pkProductOptionId.ToString(),
+                            Text = type.OptionName
+                        });
+    <label for="pOption">Option:</label>
+    @Html.DropDownList("pOption", optionList, new {@class="productField", name="pOption"})
+}
+
+
+
+@helper TagCheckboxes(Product currentItem){
+    <p>
+        @{foreach(Tag t in _common.getAllTags()){
+            string isChecked = "";
+            foreach(var x in currentItem.Tags){
+                if (x.pkTagId == t.pkTagId){isChecked = "checked";}
+            }
+            <span>
+                <input type="checkbox" name="tags" id="tag-@t.pkTagId" class="tag" value="@t.pkTagId" title="@t.TagName" @isChecked />
+                <label for="tag-@t.pkTagId">@t.TagName</label>
+            </span>
+        }}
+    </p>
+}

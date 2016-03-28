@@ -1,0 +1,75 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Modify Cooking Style";
+
+    var Id = UrlData[0].AsInt();
+    var hasId = !string.IsNullOrEmpty(UrlData[0]);
+
+    CookingStyle style = null;
+    
+    if(hasId){
+        style = new CookingStyle(Id);
+    } else{style = new CookingStyle();}
+
+    // Setup validation
+    Validation.RequireField("csName", "You must specify a cooking style.");
+    Validation.RequireField("csPrice", "You must specify a price.");
+
+    if (IsPost && Validation.IsValid()) {
+        style.Name= Request["csName"];
+        style.Description = Request["csDescription"];
+        style.Price = Request["csPrice"].Trim('$').AsInt();
+      
+
+        if(ModelState.IsValid){
+            if(hasId){
+                style.modifyCookingStyle();
+            }
+            else{
+                style.addCookingStyle();
+            }
+        }
+
+        Response.Redirect("~/admin/manageCookingStyles/");
+        
+    }
+}
+    
+
+<section id="modifyCookingStyle">
+    <header>
+        <h3><a href="~/admin/manageCookingStyles/" class="arrow">&larr;</a>
+            @{if(hasId){<text>Modify</text>}else{<text>Add</text>}}
+            Cooking Style @{if(hasId){<text>(@style.Name)</text>}}
+        </h3>
+    </header>
+
+    <form id="frmModify" method="post" action="">
+        <input type="hidden" id="pId" name="pId" value="@style.pkCookingStyleId" />
+        
+        <ul>
+            <li>
+                <label for="csName">Name:</label>
+                <input type="text" id="csName" name="csName" value="@style.Name" @Validation.For("csName") />
+                <div>@Html.ValidationMessage("csName")</div>
+            </li>
+
+            <li>
+                <label for="csDescription">Description:</label>
+                <input type="text" id="csDescription" name="csDescription" value="@style.Description" />
+            </li>
+
+            <li>
+                <label for="csPrice">Price:</label>
+                <input type="text" id="csPrice" name="csPrice" class="price" value="@string.Format("{0:c}", style.Price)" @Validation.For("csPrice") />
+                <div>@Html.ValidationMessage("csPrice")</div>
+            </li> 
+
+            <li class="actions">
+                <input type="submit" value="@{if(hasId){<text>Save Changes</text>}else{<text>Add New</text>}}" />
+                <button formaction="~/admin/manageCookingStyles">Cancel</button>
+                @if(Roles.IsUserInRole("Master") && hasId){<button formaction="~/admin/deleteCookingStyleConfirm/@Id" class="deleteButton">Delete</button>}
+            </li>
+        </ul>
+    </form>
+</section>

@@ -1,0 +1,36 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Manage Tags";
+
+    var gridDiscounts = new WebGrid(_common.getAllDiscounts(), rowsPerPage: 20);
+}
+
+<section id="manageDiscounts">
+    <header>
+            <a href="@Href("~/admin")">&larr;</a><a href="~/admin/manageDiscounts">Manage Discounts</a>
+            <small>
+                <a href="~/admin/modifyDiscount/">Add New</a>
+            </small>
+        </header>
+        @gridDiscounts.GetHtml(
+            tableStyle: "webGrid",
+            headerStyle: "head",
+            alternatingRowStyle: "alt",
+            columns: gridDiscounts.Columns(
+                gridDiscounts.Column("DType.DiscountTypeName", "Discount Type"),
+                gridDiscounts.Column("DiscountAmt", "Amount"),
+                gridDiscounts.Column("DiscountCode", "Code"),
+                gridDiscounts.Column("DiscountStartDate", "Start"),
+                gridDiscounts.Column("DiscountEndDate", "End"),
+                gridDiscounts.Column("isActive"),
+                gridDiscounts.Column("MinRoleRequired.RoleName", "Minimum Role"),
+                gridDiscounts.Column("",
+                    style: "options",
+                    format:
+                        @<text>
+                            @if(Roles.IsUserInRole("Master") || Roles.IsUserInRole("Administrator")){<a href="@Href("~/admin/modifyDiscount", item.pkDiscountId)">Edit</a>}
+                            @if(Roles.IsUserInRole("Master")){<a href="~/admin/deleteDiscountConfirm/@item.pkDiscountId" class="deleteButton">(Delete)</a>}
+                        </text>)
+            )
+        )
+</section>

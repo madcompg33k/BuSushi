@@ -1,0 +1,398 @@
+﻿@using WebMatrix.WebData
+
+@* Remove this section if you are using bundling *@
+@section Scripts {
+    <script src="~/Scripts/jquery.validate.min.js"></script>
+    <script src="~/Scripts/jquery.validate.unobtrusive.min.js"></script>
+
+    <script>
+        $(function () {
+            var html = '<tfoot><tr><td colspan="10"><strong><a href="/account/AddAddress" class="addAddressLink">(Add Another Address)</a></strong></td><td>';
+            $('#addresses').append(html);
+        });
+    </script>
+}
+
+@{
+    Layout = "~/_SiteLayout.cshtml";
+    Page.Title = "Manage Account";
+    
+    WebSecurity.RequireAuthenticatedUser();
+    if(!WebSecurity.IsCurrentUser(WebSecurity.CurrentUserName)){Response.Redirect("~/");}
+
+    Customer currentCustomer = _common.getCustomer(); 
+
+    var changesSaved = "";
+    
+
+    bool hasLocalAccount = OAuthWebSecurity.HasLocalAccount(currentCustomer.UserId);
+
+    string successMessage = "";
+    var message = Request.QueryString["message"];
+    if (message == "ChangedPassword") {
+        successMessage = "Your password has been changed.";
+    } else if (message == "SetPassword") {
+        successMessage = "Your password has been set.";
+    } else if (message == "RemovedLogin") {
+        successMessage = "The external login was removed.";
+    }
+
+    var externalLogins =
+        (from account in OAuthWebSecurity.GetAccountsFromUserName(WebSecurity.CurrentUserName)
+         let clientData = OAuthWebSecurity.GetOAuthClientData(account.Provider)
+         select new { Provider = account.Provider, ProviderDisplayName = clientData.DisplayName, UserId = account.ProviderUserId })
+        .ToList();
+    bool canRemoveLogin = externalLogins.Count > 1 || hasLocalAccount;
+
+    WebGrid gridAddresses = new WebGrid(currentCustomer.Addresses);
+    WebGrid productsGrid = new WebGrid(_common.getCartProductsByCartId(currentCustomer.UserCart.pkCartId));
+    
+    if (IsPost) {
+        currentCustomer.Username = Request["uName"];
+        currentCustomer.Email = Request.Form["email"];
+        currentCustomer.FName = Request.Form["fName"];
+        currentCustomer.LName = Request.Form["lName"];
+        currentCustomer.PhoneMain = Request.Form["phoneMain"];
+        currentCustomer.PhoneMainExt = Request.Form["phoneMainExt"];
+        currentCustomer.PhoneMainType = new PhoneType(Request.Form["phoneMainType"].AsInt());
+        currentCustomer.PhoneSecondary = Request.Form["phoneSecondary"];
+        currentCustomer.PhoneSecondaryExt = Request.Form["phoneSecondaryExt"];
+        currentCustomer.PhoneSecondaryType = new PhoneType(Request.Form["phoneSecondaryType"].AsInt());
+        
+        var action = Request["action"];
+
+        if (action == "Change Password") {
+            AntiForgery.Validate();
+            // Handle local account password operations
+            var currentPassword = Request.Form["currentPassword"];
+            var newPassword = Request.Form["newPassword"];
+            var confirmPassword = Request.Form["confirmPassword"];
+
+            // Setup validation
+            if (hasLocalAccount) {
+                //Validation.RequireField("currentPassword", "The current password field is required.");
+                Validation.Add("currentPassword",
+                    Validator.StringLength(
+                        maxLength: Int32.MaxValue,
+                        minLength: 6,
+                        errorMessage: "Current password must be at least 6 characters"));
+            }
+            //Validation.RequireField("newPassword", "The new password field is required.");
+            Validation.Add("confirmPassword",
+                //Validator.Required("The confirm new password field is required."),
+                Validator.EqualsTo("newPassword", "The new password and confirmation password do not match."));
+            Validation.Add("newPassword",
+                Validator.StringLength(
+                    maxLength: Int32.MaxValue,
+                    minLength: 6,
+                    errorMessage: "New password must be at least 6 characters"));
+
+            if (Validation.IsValid()) {
+                if (hasLocalAccount) {
+                    if (WebSecurity.ChangePassword(WebSecurity.CurrentUserName, currentPassword, newPassword)) {
+                        Response.Redirect("~/Account/Manage?message=ChangedPassword");
+                        return;
+                    } else {
+                        ModelState.AddFormError("An error occurred when attempting to change the password. Please contact the site owner.");
+                    }
+                } else {
+                    bool requireEmailConfirmation = !WebMail.SmtpServer.IsEmpty();
+                    try {
+                        WebSecurity.CreateAccount(WebSecurity.CurrentUserName, newPassword, requireEmailConfirmation);
+                        Response.Redirect("~/Account/Manage?message=SetPassword");
+                        return;
+                    } catch (System.Web.Security.MembershipCreateUserException e) {
+                        ModelState.AddFormError(e.Message);
+                    }
+                }
+            } else {
+                ModelState.AddFormError("Password change was unsuccessful. Please correct the errors and try again.");
+            }
+            
+        } else if (action == "removeLogin") {
+            // Remove external login
+            var provider = Request.Form["provider"];
+            var ExtuserId = Request.Form["userId"];
+            
+            message = null;
+            var ownerAccount = OAuthWebSecurity.GetUserName(provider, ExtuserId);
+            // Only remove the external login if it is owned by the currently logged in user and it is not the users last login credential
+            if (ownerAccount == WebSecurity.CurrentUserName && canRemoveLogin) {
+                OAuthWebSecurity.DeleteAccount(provider, ExtuserId);
+                message = "RemovedLogin";
+            }
+            Response.Redirect(Href("~/Account/Manage", new { message }));
+            return;
+        } else if(string.Equals(action, "Update Personal Information")){
+            if(ModelState.IsValid){currentCustomer.modifyCustomer();}
+        } else if(string.Equals(action, "Delete")){
+            CustomerAddress cusAddr = new CustomerAddress(Request["addressLookupId"].AsInt());
+            cusAddr.deleteCustomerAddress();
+        }
+        else {
+            // Assume this an external login request
+            string provider = Request.Form["provider"];
+            if (!provider.IsEmpty()) {
+                OAuthWebSecurity.RequestAuthentication(provider, Href("~/account/RegisterService", new { returnUrl = Href("~/account/Manage") }));
+                return;
+            }
+        }
+        
+        if(ModelState.IsValid){
+
+        }
+        
+        changesSaved = "Changes Saved!";
+
+        currentCustomer = _common.getCustomer();
+    }
+}
+
+
+<section id="manageAccount">
+    <header>
+        <h3>@Page.Title (@WebSecurity.CurrentUserName)</h3>
+    </header>
+
+    
+    @Html.ValidationSummary(excludeFieldErrors: true)
+
+    @if (!successMessage.IsEmpty()) {
+        <p class="message-success">
+            @successMessage
+        </p>
+    }
+
+    <fieldset>
+        <legend>Open Orders</legend>
+        <table>
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Price</th>
+                    <th>Qty</th>
+                    <th>Delivered To</th>
+                    <th>Ordered</th>
+                    <th>Delivery Date</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                @{ /* Add list of completed orders here */ }
+            </tbody>
+        </table>
+    </fieldset>
+
+    <fieldset>
+        <legend>Completed Orders</legend>
+        <table>
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Price</th>
+                    <th>Qty</th>
+                    <th>Delivered To</th>
+                    <th>Ordered</th>
+                    <th>Delivery Date</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                @{ /* Add list of completed orders here */ }
+            </tbody>
+        </table>
+    </fieldset>
+
+    
+    <fieldset>
+        <legend>Edit Contact Info:</legend>
+        <form method="post">
+            @AntiForgery.GetHtml()
+            <ul>
+                <li class="user-data">
+                    <label for="uName">Username:</label>
+                    <input type="text" id="uName" name="uName" value="@currentCustomer.Username" />
+
+                    <label for="email">E-Mail Address: </label>
+                    <input type="text" id="email" name="email" value="@currentCustomer.Email" />
+                </li>
+
+                <li class="user-data">
+                    <label for="fName">First Name: </label>
+                    <input type="text" id="fName" name="fName" value="@currentCustomer.FName" />
+
+                    <label for="lName">Last Name: </label>
+                    <input type="text" id="lName" name="lName" value="@currentCustomer.LName" />
+                </li>
+
+                <li class="user-data">
+                    <label for="phoneMain">Phone: </label>
+                    <input type="text" id="phoneMain" name="phoneMain" class="phone" value="@currentCustomer.PhoneMain" />
+
+                    <label for="phoneMainExt" class="phone-ext">Ext: </label>
+                    <input type="text" id="phoneMainExt" name="phoneMainExt" class="phone-ext" value="@currentCustomer.PhoneMainExt" />
+                    
+                    @Helpers.phoneTypes("phoneMainType", currentCustomer.PhoneMainType.pkPhoneTypeId)
+                </li>
+
+                <li class="user-data">
+                    <label for="phoneSecondary">Phone: </label>
+                    <input type="text" id="phoneSecondary" name="phoneSecondary" class="phone" value="@currentCustomer.PhoneSecondary" />
+
+                    <label for="phoneSecondaryExt" class="phone-ext">Ext: </label>
+                    <input type="text" id="phoneSecondaryExt" name="phoneSecondaryExt" class="phone-ext" value="@currentCustomer.PhoneSecondaryExt" />
+            
+                    @Helpers.phoneTypes("phoneSecondaryType", currentCustomer.PhoneSecondaryType.pkPhoneTypeId)
+                </li>
+                
+                <li>
+                    <form method="post">
+                        <input type="submit" name="action" value="Update Personal Information" />
+                    </form>
+                </li>
+            </ul>
+        </form>
+    </fieldset>
+
+    <fieldset>
+        <legend>
+            @if (hasLocalAccount) {
+                <text>Change Password</text>
+            } else {
+                <text>Set Password</text>
+            }
+        </legend>
+
+        <form method="post">
+            @AntiForgery.GetHtml()
+            <ul>
+                @if (hasLocalAccount) {
+                    <li class="current-password">
+                        <label for="currentPassword" @if (!ModelState.IsValidField("currentPassword")) {<text>class="error-label"</text>}>Current password</label>
+                        <input type="password" id="currentPassword" name="currentPassword" @Validation.For("currentPassword")/>
+                        @Html.ValidationMessage("currentPassword")
+                    </li>
+                }
+
+                <li class="new-password">
+                    <label for="newPassword" @if (!ModelState.IsValidField("newPassword")) {<text>class="error-label"</text>}>New password</label>
+                    <input type="password" id="newPassword" name="newPassword" @Validation.For("newPassword")/>
+                    @Html.ValidationMessage("newPassword")
+                </li>
+
+                <li class="confirm-password">
+                    <label for="confirmPassword" @if (!ModelState.IsValidField("confirmPassword")) {<text>class="error-label"</text>}>Confirm new password</label>
+                    <input type="password" id="confirmPassword" name="confirmPassword" @Validation.For("confirmPassword")/>
+                    @Html.ValidationMessage("confirmPassword")
+                </li>
+                <li>
+                    <input type="submit" name="action" value="Change Password">
+                    <br />
+                    <a href="~/Account/ForgotPassword" title="Forgot password page">Forgot your password?</a>
+                </li>
+            </ul>
+            <!-- 
+            (at)if (hasLocalAccount) {
+                <button type="submit" name="action" value="password">Change Password</button>
+                
+            } else {
+                <button type="submit" name="action" value="password">Set Password</button>
+            }
+            -->
+        </form>
+    </fieldset>
+
+    <fieldset class="addresses">
+        <legend>
+            Addresses <span class="addresses-total">You have <span class="bold">@currentCustomer.Addresses.Count</span> address(es) on file</span>
+        </legend>
+            
+        @if(currentCustomer.Addresses.Count < 1){
+            <ul><li>No Addresses Found</li><li><a href="~/account/AddAddress" class="addAddressLink">(Add Address)</a></li></ul>
+        }else{
+            @gridAddresses.GetHtml(
+                tableStyle: "webGrid gridT",
+                headerStyle: "head",
+                alternatingRowStyle: "alt",
+                htmlAttributes: new {id = "addresses"},
+                columns: gridAddresses.Columns(
+                    gridAddresses.Column("Nickname", format:
+                        @<text>
+                            @if(string.IsNullOrEmpty(item.Nickname)){
+                                <text>(none)</text>;
+                            }else{
+                                <text>@item.Nickname</text>;
+                            }
+                        </text>
+                    ),
+                    gridAddresses.Column("Address1", "Address 1"),
+                    gridAddresses.Column("Address2", "Address 2"),
+                    gridAddresses.Column("AddrCity.CityName", "City"),
+                    gridAddresses.Column("AddrCity.CState.StateName", "State"),
+                    gridAddresses.Column("AddrCity.ZipCode", "Zip"),
+                    gridAddresses.Column("SpInstructions", "Instructions"),
+                    gridAddresses.Column("isPrimary", "Primary",
+                        format: @<text>
+                            @{
+                                string itemChecked = item.isPrimary ? "checked" : "";
+                                <input type="checkbox" id="@item.pkAddressId" name="isPrimary" disabled @itemChecked />;
+                            }
+                        </text>
+                                
+                    ),
+                    gridAddresses.Column("isBilling", "Billing",
+                        format: @<text>
+                            @{
+                                string itemChecked = item.isBilling ? "checked" : "";
+                                <input type="checkbox" id="@item.pkAddressId" name="isPrimary" disabled @itemChecked />;
+                            }
+                        </text>
+                    ),
+                    gridAddresses.Column("", format:
+                        @<text>
+                            <form method="post">
+                                <input type="submit" name="action" value="Edit" />
+                                <input type="submit" name="action" value="Delete" />
+                                <input type="hidden" name="addressLookupId" value="@item.pkAddressLookupId" />
+                            </form>
+                        </text>
+                    )
+                )
+            )
+            
+        }
+    </fieldset>
+</section>
+
+<!-- section id="externalLogins">
+    (at)if (externalLogins.Count > 0) {
+        <h3>Registered external logins</h3>
+        <table>
+            <tbody>
+            (at)foreach (var externalLogin in externalLogins) {
+                <tr>
+                    <td>(at)externalLogin.ProviderDisplayName</td>
+                    <td>
+                        (at)if (canRemoveLogin) {
+                            <form method="post">
+                                (at)AntiForgery.GetHtml()
+                                <fieldset>
+                                    <legend></legend>
+                                    <input type="hidden" name="provider" value="(at)externalLogin.Provider" />
+                                    <input type="hidden" name="userId" value="(at)externalLogin.UserId" />
+                                    <button type="submit" name="action" value="removeLogin" title="Remove this (at)externalLogin.ProviderDisplayName credential from your account">Remove</button>
+                                </fieldset>
+                            </form>
+                        } else {
+                            (at): &nbsp;
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+
+    <h3>Add an external login</h3>
+    (at)RenderPage("~/Account/_ExternalLoginsList.cshtml")
+</section -->

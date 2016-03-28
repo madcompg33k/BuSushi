@@ -1,0 +1,430 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Administrator Home";
+
+    var db = Database.Open("BuSushi");
+    var alerts = db.Query("SELECT FName, LName, EMail, Phone, ContactMethod FROM DeliveryReadyAlert ORDER BY CreatedDate ASC");
+
+    var gridSchedule = new WebGrid(_common.getScheduleItems(), rowsPerPage: 10);
+
+    var gridCustomers = new WebGrid(_common.getAllCustomers(), rowsPerPage: 10);
+    var gridCustomerRolls = new WebGrid(_common.getAllCustomerRolls(), rowsPerPage: 10);
+    var gridProducts = new WebGrid(_common.getAllProducts(), rowsPerPage: 10);
+    var gridIngredients = new WebGrid(_common.getAllIngredients(), defaultSort: "Name", rowsPerPage: 10);
+    var gridOrderOptions = new WebGrid(_common.getAllOrderOptions(), rowsPerPage: 10);
+    var gridProductOptions = new WebGrid(_common.getAllProductOptions(), rowsPerPage: 10);
+    var gridCookingStyles = new WebGrid(_common.getAllCookingStyles(), rowsPerPage: 105);
+    var gridTags = new WebGrid(_common.getAllTags(), rowsPerPage: 10);
+    var gridAlerts = new WebGrid(alerts, rowsPerPage: 10);
+    var gridDiscounts = new WebGrid(_common.getAllDiscounts(), rowsPerPage: 10);
+}
+
+<script>
+    $(function () {
+        $('.edit-mode').hide();
+        $('.edit-tag').on('click', function () {
+            var tr = $(this).parents('tr:first');
+            tr.find('.edit-mode, .display-mode').toggle();
+        });
+        $('.save-tag').on('click', function () {
+            var tr = $(this).parents('tr:first');
+            var tagId = $(this).prop('id');
+            var tagName = tr.find('#TagName').val();
+            $.post(
+                '/admin/EditTag',
+                { Id: tagId, Name: tagName },
+                function(tag){
+                    tr.find('#tag-name').text(tag.Tag);
+                }, "json");
+            tr.find('.edit-mode, .display-mode').toggle();
+        });
+
+        $('span.special')
+            .filter(function () { return $(this).text() == 'True'; })
+            .parent("td").parent("tr").css({
+                'background-color': 'rgba(0, 255, 0, .3)',
+                'color': '#00f',
+                'font-weight': '500',
+                'font-style': 'italic',
+                'text-shadow': '1px 1px 1px rgba(150,150,150,1)'
+            })
+            .find("a").css({});
+
+        $('span.product-status')
+            .filter(function () { return $(this).text() == 'True'; })
+            .parent("td").parent("tr").css({
+                'background-color': 'rgba(255, 0, 0, .6)',
+                'color': '#fff',
+                'font-style': 'oblique',
+                'text-shadow': '-1px -1px 1px rgba(150,150,150,1)'
+            });
+
+        $('span.customer-roll-status')
+            .filter(function () { return $(this).text() == 'False'; })
+            .parent("td").parent("tr").css({
+                'background-color': 'rgba(255, 0, 0, .6)',
+                'color': '#fff',
+                'font-style': 'oblique',
+                'text-shadow': '-1px -1px 1px rgba(150,150,150,1)'
+            });
+    });
+</script>
+
+<section id="administration">
+    <header>
+        <h3>Site Administration</h3>
+    </header>
+
+    <div id="orders">
+        <header>
+            <a href="~/admin/specialOrders">Orders: &rarr;</a>
+        </header>
+    </div>
+
+    <div id="schedule">
+        <header>
+            <a href="~/admin/manageSchedule/">Schedule: &rarr;</a>
+            <small>
+                (<a href="~/admin/modifyScheduleItem/">Add New</a>)
+            </small>
+        </header>
+        @gridSchedule.GetHtml(
+            tableStyle: "webGrid",
+            headerStyle: "head",
+            alternatingRowStyle: "alt",
+            columns: gridSchedule.Columns(
+                gridSchedule.Column("DeliveryDate", "Date",
+                    format: @<a href="@Href("~/admin/modifyScheduleItem", item.pkDeliveryId)">@(((DateTime)item.DeliveryDate).ToShortDateString())</a>
+                ),
+                gridSchedule.Column("DCity.CityName", "City"),
+                gridSchedule.Column("DCity.ZipCode", "Zip"),
+                gridSchedule.Column("",
+                    format: @<text>
+                                @if(Roles.IsUserInRole("Master")){<a href="~/admin/deleteScheduleItemConfirm/@item.pkDeliveryId" class="deleteButton">(Delete)</a>}
+                            </text>
+                )
+            )
+        )
+    </div>
+
+    <div id="alerts">
+        <header>
+            <a href="#">Delivery Alerts</a>
+        </header>
+        @gridAlerts.GetHtml()
+    </div>
+
+    <div id="customers">
+        <header>
+            <a href="~/admin/manageCustomers">Customers &rarr;</a>
+        </header>
+        @gridCustomers.GetHtml(
+            tableStyle: "webGrid",
+            headerStyle: "head",
+            alternatingRowStyle: "alt",
+            columns: gridCustomers.Columns(
+                gridCustomers.Column("Username", "Username"),
+                gridCustomers.Column("FName", "First Name"),
+                gridCustomers.Column("LName", "Last Name"),
+                gridCustomers.Column("isConfirmed", "Confirmed"),
+                gridCustomers.Column("UStatus.Status", "User Status"),
+                gridCustomers.Column(
+                    style: "options",
+                    format:
+                        @<text>
+                            <a href="~/admin/viewCustomer/@item.UserId">View</a>
+                            <a href="~/admin/banCustomer/@item.UserId">Block</a>
+                        </text>
+                )
+            )
+        )
+    </div>
+
+    <div id="products">
+        <header>
+            <a href="~/admin/manageProducts">Products &rarr;</a>
+            <small>
+                <a href="~/admin/modifyProduct/">(Add New)</a>
+            </small>
+        </header>
+    @gridProducts.GetHtml(
+        tableStyle: "webGrid",
+        headerStyle: "head",
+        alternatingRowStyle: "alt",
+        columns: gridProducts.Columns(
+            gridProducts.Column("Name"),
+            gridProducts.Column("JPName", "Japanese Name"),
+            gridProducts.Column("PType.ProductTypeName", "Product Type"),
+            gridProducts.Column("Price", format:@<text>@String.Format("{0:C}", item.Price)</text>),
+            gridProducts.Column("", "Special",
+                                format: @<text>
+                                    @if(item.SpecialBeginDate <= DateTime.Now && item.SpecialEndDate >= DateTime.Now){
+                                        <span class="special">True</span>
+                                    } else{<span class="special">False</span>}
+                                    @if(item.SpecialEndDate <= DateTime.Now.AddDays(7)){
+                                        <p>Ends @(((DateTime)item.SpecialEndDate).ToShortDateString())</p>
+                                    }
+                                </text>
+            ),
+            gridProducts.Column("discontinued", "Discontinued",
+                                format:
+                                @<text>
+                                    <span class="product-status">@item.Discontinued</span>
+                                </text>
+            ),
+            gridProducts.Column(
+                style: "options",
+                format:
+                    @<text>
+                        <a href="~/admin/modifyProduct/@item.pkProductId">Edit</a>
+                        @if(Roles.IsUserInRole("Master")){<a href="@Href("~/admin/deleteProductConfirm", item.pkProductId)" class="deleteButton">(Delete)</a>}
+                    </text>
+            )
+        )
+    )
+    </div>
+
+    <div id="customerRolls">
+        <header>
+            <a href="~/admin/manageCustomerRolls">Customer Rolls &rarr;</a>
+        </header>
+        @gridCustomerRolls.GetHtml(
+            tableStyle: "webGrid",
+            headerStyle: "head",
+            alternatingRowStyle: "alt",
+            columns: gridCustomerRolls.Columns(
+                gridCustomerRolls.Column("RollName", "Name",
+                    format: @<text>
+                        @if(string.IsNullOrEmpty(item.RollName)){<span class="italic">(Custom Roll)</span>}
+                        else{<span>@item.RollName</span>}
+                    </text>
+                ),
+                gridCustomerRolls.Column("RType.RollTypeName", "RollType"),
+                gridCustomerRolls.Column("", "Ingredients (Inside)", format:(item)=>{
+                    if(item.IngredientsInside.Count >= 1){
+                        decimal ingredientsCost = 0;
+                        foreach(Ingredient i in item.IngredientsInside){ingredientsCost += i.IngredientPricePerRoll;}
+                        WebGrid subGrid = new WebGrid(source: item.IngredientsInside, rowsPerPage: 100);
+                        return subGrid.GetHtml(
+                            htmlAttributes: new {@class="subT"},
+                            columns: subGrid.Columns(
+                                subGrid.Column("IngredientName", String.Format("{0:C}", ingredientsCost + 2), canSort: false)
+                            )
+                        );
+                    } else{return "(none)";}
+                }),
+                gridCustomerRolls.Column("", "Ingredients (Top)", format:(item)=>{
+                    if(item.IngredientsTop.Count >= 1){
+                        decimal ingredientsCost = 0;
+                        foreach(Ingredient i in item.IngredientsTop){ingredientsCost += i.IngredientPricePerRoll;}
+                        WebGrid subGrid = new WebGrid(source: item.IngredientsTop, rowsPerPage: 100);
+                        return subGrid.GetHtml(
+                            htmlAttributes: new {@class="subT"},
+                            columns: subGrid.Columns(
+                                subGrid.Column("IngredientName", String.Format("{0:C}", ingredientsCost), canSort: false)
+                            )
+                        );
+                    } else{return "(none)";}
+                }),
+                gridCustomerRolls.Column("Price"),
+                gridCustomerRolls.Column("", "Special",
+                    format: @<text>
+                        @if(item.SpecialBeginDate <= DateTime.Now && item.SpecialEndDate >= DateTime.Now){
+                            <span class="special">True</span>
+                        } else{<span class="special">False</span>}
+                        @if(item.SpecialEndDate <= DateTime.Now.AddDays(7)){
+                            <p>Ends @(((DateTime)item.SpecialEndDate).ToShortDateString())</p>
+                        }
+                    </text>
+                ),
+                gridCustomerRolls.Column("isActive", "Active",
+                    format: @<text>
+                        <span class="customer-roll-status">@item.isActive</span>
+                    </text>
+                ),
+                gridIngredients.Column(
+                    style: "options",
+                    format:
+                        @<text>
+                            <a href="~/admin/viewCustomerRoll/@item.pkCustomerRollId">View</a>
+                            @if(Roles.IsUserInRole("Master")){<a href="~/admin/deleteCustomerRollConfirm/@item.pkCustomerRollId" class="deleteButton">(Delete)</a>}
+                        </text>)
+            )
+        )
+    </div>
+
+    <div id="ingredients">
+        <header>
+            <a href="~/admin/manageIngredients">Ingredients &rarr;</a>
+            <small>
+                <a href="~/admin/modifyIngredient/">(Add New)</a>
+            </small>
+        </header>
+        @gridIngredients.GetHtml(
+            tableStyle: "webGrid",
+            headerStyle: "head",
+            alternatingRowStyle: "alt",
+            columns: gridIngredients.Columns(
+                                    gridIngredients.Column("IngredientName", "Name", style: "name"),
+                                    gridIngredients.Column("IngredientAltName", "Alt Name"),
+                                    gridIngredients.Column("IGroup.GroupName", "Group"),
+                                    gridIngredients.Column("IngredientPricePerRoll", "Price",
+                                        format:@<text>@String.Format("{0:C}", item.IngredientPricePerRoll)</text>),
+                                    gridIngredients.Column("Active"),
+                                    gridIngredients.Column(
+                                        style: "options",
+                                        format:
+                                            @<text>
+                                                <a href="~/admin/modifyIngredient/@item.pkIngredientId">Edit</a>
+                                                @if(Roles.IsUserInRole("Master")){<a href="~/admin/deleteIngredientConfirm/@item.pkIngredientId" class="deleteButton">(Delete)</a>}
+                                            </text>)
+            )
+        )
+    </div>
+
+    <div id="orderOptions">
+        <header>
+            <a href="~/admin/manageOrderOptions">Order Options &rarr;</a>
+            <small>
+                <a href="~/admin/modifyOrderOption/">Add New</a>
+            </small>
+        </header>
+        @gridOrderOptions.GetHtml(
+            tableStyle: "webGrid",
+            headerStyle: "head",
+            alternatingRowStyle: "alt",
+            columns: gridOrderOptions.Columns(
+                gridOrderOptions.Column("OptionName", "Name"),
+                gridOrderOptions.Column("OptionDescription", "Description"),
+                gridOrderOptions.Column("OptionPrice", "Price",
+                format: @<span>@String.Format("{0:C}", item.OptionPrice)</span>
+                ),
+                gridOrderOptions.Column("Active", "Active",
+                    format: @<text>
+                                <span class="status">@item.Active</span>
+                            </text>
+                ),
+                gridOrderOptions.Column(
+                    style: "options",
+                    format:
+                        @<text>
+                            <a href="~/admin/modifyOrderOption/@item.pkOptionId">Edit</a>
+                        </text>)
+            )
+        )
+    </div>
+
+    <div id="productOptions">
+        <header>
+            <a href="~/admin/manageProductOptions">Product Options &rarr;</a>
+            <small>
+                <a href="~/admin/modifyProductOption/">(Add new)</a>
+            </small>
+        </header>
+        @gridProductOptions.GetHtml(
+            tableStyle: "webGrid",
+            headerStyle: "head",
+            alternatingRowStyle: "alt",
+            columns: gridProductOptions.Columns(
+                gridProductOptions.Column("OptionName", "Name"),
+                gridProductOptions.Column("OptionDescription", "Description"),
+                gridProductOptions.Column("OGroup.GroupName", "Group"),
+                gridProductOptions.Column(
+                    style: "options",
+                    format: @<text><a href="~/admin/modifyProductOption/@item.pkProductOptionId">Edit</a></text>
+                )
+            )
+        )
+    </div>
+
+    <div id="cookingStyles">
+        <header>
+            <a href="~/admin/manageCookingStyles">Cooking Styles &rarr;</a>
+            <small>
+                (<a href="~/admin/modifyCookingStyle/">Add New</a>)
+            </small>
+        </header>
+        @gridCookingStyles.GetHtml(
+            tableStyle: "webGrid",
+            headerStyle: "head",
+            alternatingRowStyle: "alt",
+            columns: gridCookingStyles.Columns(
+                gridCookingStyles.Column("Name"),
+                gridCookingStyles.Column("Description"),
+                gridCookingStyles.Column("Price", format:@<text>$@(item.Price)</text>)
+            )
+        )
+    </div>
+
+    <div id="tags">
+        <header>
+            <a href="~/admin/manageTags">Tags &rarr;</a>
+            <small>
+                <a href="~/admin/addTag/">Add New</a>
+            </small>
+        </header>
+        @gridTags.GetHtml(
+            tableStyle: "webGrid",
+            headerStyle: "head",
+            alternatingRowStyle: "alt",
+            columns: gridTags.Columns(
+                gridTags.Column("TagName", "Tag Name",
+                                style: "name",
+                                format:
+                                    @<text>
+                                        <span id="tag-name" class="display-mode">@item.TagName</span>
+                                        @Html.TextBox("TagName", item.TagName, new {@class="edit-mode", size=100})
+                                    </text>),
+                gridTags.Column("",
+                    style: "options",
+                    format:
+                        @<text>
+                            <button class="edit-tag display-mode" id="@item.pkTagId">Edit</button>
+                            <button class="save-tag edit-mode" id="@item.pkTagId">Save</button>
+                            @if(Roles.IsUserInRole("Master")){<a href="~/admin/deleteTagConfirm/@item.pkTagId" class="deleteButton">(Delete)</a>}
+                        </text>)
+            )
+        )
+    </div>
+    
+    <div id="discounts">
+        <header>
+            <a href="~/admin/manageDiscounts">Discounts &rarr;</a>
+            <small>
+                <a href="~/admin/modifyDiscount/">Add New</a>
+            </small>
+        </header>
+        @gridDiscounts.GetHtml(
+            tableStyle: "webGrid",
+            headerStyle: "head",
+            alternatingRowStyle: "alt",
+            columns: gridDiscounts.Columns(
+                gridDiscounts.Column("DType.DiscountTypeName", "Discount Type"),
+                gridDiscounts.Column("DiscountAmt", "Amount",
+                    format: @<text>
+                                @if(string.Equals(item.DType.DiscountTypeName, "Percent")){
+                                    <span>@String.Format("{0:P}", item.DiscountAmt)</span> 
+                                }else{<span>@String.Format("{0:C}", item.DiscountAmt)</span>}
+                            </text>),
+                gridDiscounts.Column("DiscountCode", "Code"),
+                gridDiscounts.Column("DiscountStartDate", "Start"),
+                gridDiscounts.Column("DiscountEndDate", "End"),
+                gridDiscounts.Column("isActive"),
+                gridDiscounts.Column("MinRoleRequired.RoleName", "Min Role"),
+                gridDiscounts.Column("",
+                    style: "options",
+                    format:
+                        @<text>
+                            <a href="@Href("~/admin/modifyDiscount", item.pkDiscountId)">Edit</a>
+                            @if(Roles.IsUserInRole("Master")){<a href="~/admin/deleteDiscountConfirm/@item.pkDiscountId" class="deleteButton">(Delete)</a>}
+                        </text>)
+            )
+        )
+    </div>
+
+    <div id="addresses">
+        <header>
+            <a href="~/admin/manageAddresses">Addresses &rarr;</a>
+        </header>
+    </div>
+</section>

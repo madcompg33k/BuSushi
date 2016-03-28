@@ -1,0 +1,52 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Delete Ingredient";
+
+    if (!Roles.IsUserInRole("Master")){
+        Response.Redirect("~/");
+    }
+
+    var id = UrlData[0].AsInt();
+    
+    Product currentItem;
+    
+    if(id != null){currentItem = new Product(id);}
+    else{
+        currentItem = new Product();
+        Response.Redirect("~/admin/");
+    }
+
+    var db = Database.Open("buSushi");
+    var cartQuery = db.Query(@"SELECT p.Name FROM CartItems ci
+                                INNER JOIN Products p ON p.pkId = ci.fkProductId
+                                WHERE p.pkId = @0", currentItem.pkProductId);
+    var orderQuery = db.Query(@"SELECT p.Name FROM OrderItems oi
+                                INNER JOIN Products p ON p.pkId = oi.fkProductId
+                                WHERE p.pkId = @0", currentItem.pkProductId);
+}
+    
+
+<section id="deleteTag">
+    <header>
+        <h3>Delete Product (@currentItem.Name)</h3>
+    </header>
+
+    @if(cartQuery.Any() || orderQuery.Any()){
+        <div>
+            We're sorry but this item is referenced by other items. Please remove this reference before
+            deleting this item.
+            <br />
+            <p><a href="@Href("~/admin/manageProducts")">Return</a></p>
+            
+        </div>
+    }else{
+        <form id="frmDelete" method="delete" action="~/admin/deleteProduct/@id">
+            <h2>Are you sure you want to delete @currentItem.Name? (ID: @currentItem.pkProductId)</h2>
+            <small>(This action is irreversible)</small>
+
+            <input type="submit" value="Yes" />
+            <button formaction="~/admin/">No</button>
+        </form>
+    }
+    
+</section>

@@ -1,0 +1,40 @@
+﻿@{
+    Layout = "~/_SiteLayout.cshtml";
+    Page.Title = "Delivery Schedule";
+
+    int scheduleLocation = -1;
+
+    if (IsPost){
+        scheduleLocation = Request.Form["scheduleLocation"].AsInt();
+    }
+
+}
+
+<section id="catering">
+    <header>
+        <h3>@Page.Title</h3>
+    </header>
+    @*
+    <!-- form method="post">
+        <select id="scheduleLocation" name="scheduleLocation">
+            <option>Choose a location</option>
+            @foreach(var item in _common.getDeliveryAreas()){
+                <option id="@item.DeliveryAreaName" value="@item.pkDeliveryAreaId" @if(scheduleLocation == item.pkDeliveryAreaId){<text>selected</text>}>@item.DeliveryAreaName</option>
+            }
+        </select>
+
+        <input type="submit" value="Get Schedule" />
+    </form>
+    <p>All delivery times will be somewhere between 10:30AM - 1PM, depending on your location on the route.</p>
+    
+    @foreach(var item in _common.getSchedule(scheduleLocation)){
+        <div>@item.DeliveryDate.Value.ToString("d")</div>
+    }
+    -->
+    *@
+    <p>We apologize, but we are currently still in the process of finding a commercial kitchen to rent in order to
+    make your sushi to the highest possible standards. As soon as we have procured a kitchen to prepare all of our
+    wonderful food for you, we will update this page with a delivery schedule.</p>
+    <p><a href="~/alertMe/">Sign Up</a> to be alerted when we start delivering.</p>
+
+</section>

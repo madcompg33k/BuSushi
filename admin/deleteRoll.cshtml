@@ -1,0 +1,36 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Delete Roll";
+
+    if (!Roles.IsUserInRole("Master")){
+        Response.Redirect("~/");
+    }
+
+    var id = UrlData[0].AsInt();
+    var isDeleted = false;
+
+    Roll currentItem;
+    if(id != null){
+        currentItem = new Roll(_common.getRollProduct(id));
+        currentItem.deleteRoll();
+        currentItem.deleteSushi();
+        currentItem.deleteFood();
+        currentItem.deleteProduct();
+        isDeleted = true;
+    }
+    else{
+        currentItem = new Roll();
+        Response.Redirect("~/admin/");
+    }
+
+}
+
+<section id="rollDeleted">
+    @if(isDeleted){
+        <header><h3>@currentItem.Name deleted!</h3></header>
+        <p>@currentItem.Name has been deleted, this cannot be undone.</p>
+        <p><a href="~/admin/manageRolls">Return</a></p>
+    } else{
+        <text>There has been an error, please try again.</text>
+    }
+</section>

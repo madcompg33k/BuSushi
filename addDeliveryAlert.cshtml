@@ -1,0 +1,47 @@
+﻿@{
+    Layout = "~/_SiteLayout.cshtml";
+    Page.Title = "Add Delivery Alert";
+
+    int userId = WebSecurity.IsAuthenticated ? WebSecurity.CurrentUserId : -1;
+    string FName = "";
+    string LName = "";
+    string Phone = "";
+    string ContactMethod = "";
+    string EMail = "";
+    var error = "";
+    
+    if (IsPost){
+        try{
+            FName = Request["fName"];
+            LName = Request["lName"];
+            Phone = Request["Phone"];
+            ContactMethod = Request["contactMethod"];
+            EMail = Request["email"];
+
+            var db = Database.Open("BuSushi");
+
+            var commandText = @"INSERT INTO DeliveryReadyAlert (fkUserId, fkCustomerId, FName, LName, EMail, CreatedDate, ContactMethod, Phone)
+                                VALUES (@0, @1, @2, @3, @4, @5, @6, @7)";
+            db.Execute(commandText, userId, null, FName, LName, EMail, DateTime.Now, ContactMethod, Phone);
+        } catch(Exception e){error = e.Message;}
+        
+    }
+
+}
+<!DOCTYPE html>
+
+
+<section id="createdDeliveryAlert">
+    <header>
+        <h3>You have created an alert!</h3>
+    </header>
+        <p>@error</p>
+        <p>
+            We've got your alert setup and we'll let you know as soon as we're ready to start delivering!
+            <br /><br />
+            Contact Method: @ContactMethod
+            <br /><br />
+            <a href="~/">Return</a> to our home page, or view our <a href="~/products">products.</a>
+        </p>
+
+</section>

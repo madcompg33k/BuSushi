@@ -1,0 +1,16 @@
+﻿@{
+    if (!Roles.IsUserInRole("Master")){Response.Redirect("~/");}
+
+    var id = UrlData[0].AsInt();
+    Tag currentItem;
+
+    if(id != null){
+        currentItem = new Tag(id);
+        currentItem.deleteTag();
+        Response.Redirect(Href("~/admin/deleteComplete", true, "tags"));
+    }else{
+        currentItem = new Tag();
+        Response.Redirect(Href("~/admin/deleteComplete", false, "tags"));
+    }
+
+}

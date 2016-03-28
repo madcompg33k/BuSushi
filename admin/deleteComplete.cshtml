@@ -1,0 +1,19 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Item Deleted";
+
+    if (!Roles.IsUserInRole("Master")){Response.Redirect("~/");}
+    var isDeleted = UrlData[0].AsBool(false);
+    var anchor = UrlData[1];
+}
+
+
+<section id="itemDeleted">
+    @if(isDeleted){
+        <header><h3>Item deleted!</h3></header>
+        <p>The item has been deleted, this cannot be undone.</p>
+        <p><a href="~/admin/#@anchor">Return</a></p>
+    } else{
+        <text>There has been an error, please try again.</text>
+    }
+</section>

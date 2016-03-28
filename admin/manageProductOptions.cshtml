@@ -1,0 +1,40 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Manage Product Options";
+
+    var options = _common.getAllProductOptions();
+
+    var gridProductOptions = new WebGrid(source: options,
+                                defaultSort: "Name",
+                                rowsPerPage: 10);
+}
+
+<section id="manageOptions">
+    <header>
+        <h3><a href="~/admin" class="arrow">&larr;</a>@Page.Title <small><a href="~/admin/modifyProductOption/">Add New</a></small></h3>
+    </header>
+
+    @gridProductOptions.GetHtml(
+        tableStyle: "webGrid",
+        headerStyle: "head",
+        alternatingRowStyle: "alt",
+        columns: gridProductOptions.Columns(
+            gridProductOptions.Column("OptionName", "Name"),
+            gridProductOptions.Column("OptionDescription", "Description"),
+            gridProductOptions.Column("OGroup.GroupName", "Group"),
+            gridProductOptions.Column("Active", "Active",
+                format: @<text>
+                            <span class="status">@item.Active</span>
+                        </text>
+            ),
+            gridProductOptions.Column(
+                style: "options",
+                format:
+                    @<text>
+                        <a href="~/admin/modifyProductOption/@item.pkProductOptionId">Edit</a>
+                    </text>)
+        )
+    )
+
+
+</section>

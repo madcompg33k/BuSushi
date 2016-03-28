@@ -1,0 +1,35 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Manage Cooking Styles";
+
+    var styles = _common.getAllCookingStyles();
+
+    var styleGrid = new WebGrid(source: styles,
+                                defaultSort: "Name",
+                                rowsPerPage: 10);
+}
+
+<section id="manageIngredients">
+    <header>
+        <h3><a href="~/admin" class="arrow">&larr;</a>@Page.Title <small><a href="~/admin/modifyCookingStyle/">Add New</a></small></h3>
+    </header>
+
+    @styleGrid.GetHtml(
+        tableStyle: "webGrid",
+        headerStyle: "head",
+        alternatingRowStyle: "alt",
+        columns: styleGrid.Columns(
+                                styleGrid.Column("Name", "Name"),
+                                styleGrid.Column("Description"),
+                                styleGrid.Column("Price"),
+                                styleGrid.Column(
+                                    style: "options",
+                                    format:
+                                        @<text>
+                                            <a href="~/admin/modifyCookingStyle/@item.pkCookingStyleId">Edit</a>
+                                        </text>)
+        )
+    )
+
+
+</section>

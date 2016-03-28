@@ -1,0 +1,340 @@
+﻿@{
+    Layout = "~/_SiteLayout.cshtml";
+    Page.Title = "Review Cart";
+
+    /* Get current customer */
+    Customer currentCustomer = _common.getCustomer();
+
+    if (!currentCustomer.hasId()){
+        Response.Redirect("~/");
+    }
+
+    decimal SubTotal = 0;
+    decimal DiscountAmt = 0;
+    decimal Tax = 0;
+    decimal Total = 0;
+
+    var db = Database.Open("BuSushi");
+    bool hasAlert = db.QueryValue("SELECT pkDeliveryReadyAlertId from DeliveryReadyAlert WHERE fkUserId = @0", currentCustomer.UserId) == null ? false : true;
+
+    List<CartItem> cartProducts = _common.getCartProductsByCartId(currentCustomer.UserCart.pkCartId);
+    List<CartItem> cartRolls = _common.getCartRollsByCartId(currentCustomer.UserCart.pkCartId);
+
+    
+    var error = "";
+
+    /* Setup validation */
+    Validation.Add("Qty",
+        Validator.Required("Please enter a quantity."),
+        Validator.Range(1, 6, "Qty must be between 1 and 6. For large orders please check our catering page.")
+    );
+    if (IsPost && Validation.IsValid()){
+        var action = Request.Form["action"];
+        try{
+            /* Get the cart item we're working with */
+            CartItem ci = new CartItem(Request["cartItem"].AsInt());
+
+            /* Do something */
+            if(string.Equals(action, "Remove")){
+                ci.deleteCartItem();
+            } else if(string.Equals(action, "Update")){
+                /* Check if qty was changed */
+                if(ci.Qty != Request["Qty"].AsInt()){
+                    /* Update qty */
+                    ci.Qty = Request["Qty"].AsInt();
+                    ci.updateCartItemQty();
+                }
+
+                /* Check if options were changed */
+            }
+        }catch(Exception e){error = e.Message;}
+
+        /* Update what the cart "looks" like */
+        cartProducts = _common.getCartProductsByCartId(currentCustomer.UserCart.pkCartId);
+        cartRolls = _common.getCartRollsByCartId(currentCustomer.UserCart.pkCartId);
+    }
+    
+    var productsGrid = new WebGrid(cartProducts, canPage: false, canSort: false);
+    var rollsGrid = new WebGrid(cartRolls, canPage: false, canSort: false);
+
+    var productsTotal = cartProducts.Sum(t => (decimal)t.Total);
+    var rollsTotal =  + cartRolls.Sum(t => (decimal)t.Total);
+
+    SubTotal = productsTotal + rollsTotal;
+    DiscountAmt += cartProducts.Sum(t => t.CIDiscount.DiscountDollar);
+    DiscountAmt += cartRolls.Sum(t => t.CIDiscount.DiscountDollar);
+    Tax = (SubTotal - DiscountAmt) * (decimal)0.094;
+    Total = SubTotal - DiscountAmt + Tax;
+
+    if (cartProducts.Count() < 1 && cartRolls.Count() < 1){Response.Redirect("~/");}
+}
+
+<script type="text/javascript">
+    function confirmDelete() {
+        return confirm("Are you sure you want to delete this item from your cart?");
+    }
+</script>
+
+<section id="shoppingCart">
+    <header><h3>@Page.Title</h3></header>
+    @error
+    <form method="post">
+    @Html.ValidationSummary()
+    @{if(cartProducts.Count() > 0){
+        <div id="grid">
+            <header><span>Products</span></header>
+            @productsGrid.GetHtml(
+                tableStyle: "webGrid gridT",
+                headerStyle: "head",
+                alternatingRowStyle: "alt",
+                htmlAttributes: new {id = "productsCart"},
+                columns: productsGrid.Columns(
+                    productsGrid.Column("CIProduct.Name", "Name",
+                        format: @<text>
+                                <a href="~/productDetails/@item.CIProduct.pkProductId">@item.CIProduct.Name</a>
+                                <br />
+                                <span class="cartitem-instructions">@item.Instructions</span>
+                        </text>
+                    ),
+                    productsGrid.Column("CIProduct.Price", "Item Price", format: @<text>@item.CIProduct.Price.ToString("c")</text>),
+                    productsGrid.Column("CIDiscount.DiscountAmt", "Discount",
+                        format: @<text>@item.CIDiscount.DiscountDollar.ToString("c")</text>
+                    ),
+                    productsGrid.Column("", "Options", format: (item)=>{
+                        if(item.Options.Count > 0){
+                            WebGrid subGrid = new WebGrid(source: item.Options, rowsPerPage: 100);
+                            return subGrid.GetHtml(
+                                htmlAttributes: new {@class="subT"},
+                                columns: subGrid.Columns(
+                                    subGrid.Column("OptionName", String.Format("{0:C}",item.OptionsTotal), canSort: false),
+                                    subGrid.Column("OptionPrice", "", canSort: false,
+                                        format: (subitem) =>{
+                                            return "($"+ subitem.OptionPrice.ToString() + ")";
+                                        }
+                                            
+                                    )
+                                )
+                            );
+                        } else if (item.ProductOptions.Count > 0){
+                            WebGrid subGrid = new WebGrid(source: item.ProductOptions, rowsPerPage: 100);
+                            return subGrid.GetHtml(
+                                htmlAttributes: new {@class="subT"},
+                                columns: subGrid.Columns(
+                                    subGrid.Column("OptionName", String.Format("{0:C}",item.OptionsTotal), canSort: false)
+                                )
+                            );
+                        } else{return "(none)";}
+                    }),
+                    productsGrid.Column("Price","Subtotal",
+                        format: @<text>
+                                    @String.Format("{0:C}", item.Price)
+                                </text>
+                    ),
+                    productsGrid.Column("Qty", "Qty",
+                        format: @<form method="post">
+                                    <input type="hidden" value="@item.pkCartItemId" name="cartItem" />
+                                    <input type="text" id="@item.CIProduct.pkProductId" name="Qty" class="qty" value="@item.Qty"  @Validation.For("Qty") />
+                                    <input type="submit" name="action" class="update-cartitem-qty" value="Update" />
+                                </form>
+                    ),
+                    productsGrid.Column("", "Total", format: @<text>@item.Total.ToString("c")</text>),
+                    productsGrid.Column("", format: @<form method="post" onsubmit="return confirmDelete()">
+                                                <input type="hidden" value="@item.pkCartItemId" name="cartItem" />
+                                                <input type="hidden" name="Qty" value="@item.Qty" />
+                                                <input type="submit" name="action" class="remove-cartitem" value="Remove" />
+                                            </form>
+                    )
+                )
+            )
+        </div>
+    }}
+    
+    @{if(cartRolls.Count() < 1){} else{
+        <div id="grid">
+            <header><span>Your Custom Rolls</span></header>
+            @rollsGrid.GetHtml(
+                tableStyle: "webGrid custom-rolls-grid",
+                headerStyle: "head",
+                alternatingRowStyle: "alt",
+                htmlAttributes: new {id = "customCart"},
+                columns: rollsGrid.Columns(
+                    rollsGrid.Column("CICustomerRoll.RollName", "Roll Name",
+                        format: @<text>
+                        <span class="cartitem-name">
+                            @if(item.CICustomerRoll.RollName == null){<text><i>Custom Roll</i></text>}else{<text>@item.CICustomerRoll.RollName</text>}
+                        </span>
+                        <br />
+                        <span class="cartitem-instructions">@item.Instructions</span>
+                        </text>
+                    ),
+                    rollsGrid.Column("", "Ingredients (Inside)", format:(item)=>{
+                        if(item.CICustomerRoll.IngredientsInside.Count >= 1){
+                            decimal ingredientsCost = 0;
+                            foreach(Ingredient i in item.CICustomerRoll.IngredientsInside){ingredientsCost += i.IngredientPricePerRoll;}
+                            WebGrid subGrid = new WebGrid(source: item.CICustomerRoll.IngredientsInside, rowsPerPage: 100);
+                            return subGrid.GetHtml(
+                                htmlAttributes: new {@class="subT"},
+                                columns: subGrid.Columns(
+                                    subGrid.Column("IngredientName", String.Format("{0:C}", ingredientsCost + 2), canSort: false)
+                                )
+                            );
+                        } else{return "(none)";}
+                    }),
+                    rollsGrid.Column("", "Ingredients (Top)", format:(item)=>{
+                        if(item.CICustomerRoll.IngredientsTop.Count >= 1){
+                            decimal ingredientsCost = 0;
+                            foreach(Ingredient i in item.CICustomerRoll.IngredientsTop){ingredientsCost += i.IngredientPricePerRoll;}
+                            WebGrid subGrid = new WebGrid(source: item.CICustomerRoll.IngredientsTop, rowsPerPage: 100);
+                            return subGrid.GetHtml(
+                                htmlAttributes: new {@class="subT"},
+                                columns: subGrid.Columns(
+                                    subGrid.Column("IngredientName", String.Format("{0:C}", ingredientsCost), canSort: false)
+                                )
+                            );
+                        } else{return "(none)";}
+                    }),
+                    productsGrid.Column("CIDiscount.DiscountAmt", "Discount", format: @<text>@item.CIDiscount.DiscountAmt.ToString("c")</text>),
+                    rollsGrid.Column("Price", "Item Price", format: @<text>@item.Price.ToString("c")</text>),
+                    rollsGrid.Column("Qty", "Qty",
+                        format: @<form method="post">
+                                    <input type="hidden" value="@item.pkCartItemId" name="cartItem" />
+                                    <input type="text" id="@item.CICustomerRoll.pkCustomerRollId" name="Qty" class="qty" value="@item.Qty" @Validation.For("Qty") />
+                                    <input type="submit" name="action" class="update-cartitem-qty" value="Update" />
+                                </form>
+                    ),
+                    rollsGrid.Column("Total", "Total", format: @<text>@item.Total.ToString("c")</text>),
+                    rollsGrid.Column("", format: @<form method="post" onsubmit="return confirmDelete()">
+                                                <input type="hidden" value="@item.pkCartItemId" name="cartItem" />
+                                                <input type="hidden" name="Qty" value="@item.Qty" />
+                                                <input type="submit" name="action" class="remove-cartitem" value="Remove" />
+                                            </form>
+                    )
+                )
+            )
+        </div>
+    }}
+
+    <div id="totals">
+        <table id="calculateTotals">
+            <thead>
+                <tr>
+                    <td colspan="3"></td>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    </div>
+    </form>
+    <br />
+    <span id="siteseal"><script type="text/javascript" src="http://seal.godaddy.com/getSeal?sealID=S0qDiAvFIHo2b6xN7Q26OvrkWGDcDahHw3wftuajd3VqlN24BusPHVlf2tM"></script></span>
+    <br />
+
+
+    @*{/*
+    <!-- ul>
+        <li id="chooseDate">
+            <label for="deliveryDate">Delivery Date:</label>
+            <select id="deliveryDate" required>
+                @{
+                    if (_common.getScheduleItems().Count() > 0) {
+                        <option>Please select a date</option>
+                        foreach(scheduleItem p in _common.getScheduleItems()){
+                            <option id="@p.DeliveryDate" value="@p.DeliveryDate">@p.DeliveryDate</option>
+                        }
+                    } else{<option>No delivery dates available</option>}
+                }
+            </select>
+        </li>
+    </ul>
+
+    <p class="actions">
+        <a href="~/checkout">Checkout</a>
+    </p -->
+    */}*@
+
+    <article>
+        We're sorry, but we're not quite ready to deliver yet,
+        <br />
+        however, your cart will be saved and ready for you when we are.
+        <br /><br />
+        @{
+            if (hasAlert == null){
+                <text>
+                    If you'd like, please add your name and e-mail to our list
+                    and we'll let you know as soon as we're delivery so you can be
+                    one of the first to get our sushi!
+                    <br />
+                    <form method="post" action="addDeliveryAlert">
+                        <ul>
+                            <li>
+                                <label for="fName">First Name:</label>
+                                <input type="text" id="fName" name="fName" />
+                            </li>
+
+                            <li>
+                                <label for="lName">Last Name:</label>
+                                <input type="text" id="lName" name="lName" />
+                            </li>
+
+                            <li>
+                                <label for="phone">Phone #:</label>
+                                <input type="text" id="phone" name="phone" />
+                            </li>
+
+                            <li>
+                                <label for="email">E-Mail:</label>
+                                <input type="text" id="email" name="email" />
+                            </li>
+
+                            <li>
+                                <label for="contactMethod">Contact Method:</label>
+                                <select id="contactMethod" name="contactMethod">
+                                    <option id="email">E-Mail</option>
+                                    <option id="text">Text</option>
+                                    <option id="call">Call</option>
+                                </select>
+                            </li>
+
+                            <li class="actions">
+                                <input type="submit" value="Add to List" />
+                            </li>
+                        </ul>
+                    </form>
+                </text>
+            } else{
+                <text>
+                    You've already got an alert setup with us, so just keep an eye on whatever
+                    contact method you requested we use and we'll let you know as soon as we're
+                    ready to start delivery! Thank you for your patience!
+                </text>
+            }
+        }
+    </article>
+    <p>&nbsp;</p>
+
+    @section scripts{
+        <script>
+            $(function () {
+                var html = '<tfoot><tr><td colspan="5"><strong>Total</strong></td><td>';
+                html += '<strong>@productsTotal.ToString("c")</strong>';
+                html += '</td><td colspan="2">&nbsp;</td></tr></tfoot>';
+                $('#productsCart').append(html);
+
+                html = '<tfoot><tr><td colspan="6"><strong>Total</strong></td><td>';
+                html += '<strong>@rollsTotal.ToString("c")</strong>';
+                html += '</td><td colspan="2">&nbsp;</td></tr></tfoot>';
+                $('#customCart').append(html);
+            });
+
+            $(function(){
+                var html = '<tr><td></td><td>Sub Total:</td><td>@SubTotal.ToString("c")</td></tr>';
+                html+= '<tr><td></td><td>Discounts:</td><td>@DiscountAmt.ToString("c")</td></tr>';
+                html += '<tr><td></td><td>Tax:</td><td>@Tax.ToString("c")</td></tr>';
+                html += '<tr><td></td><td class="bold">Total:</td><td class="bold">@Total.ToString("c")</td></tr>';
+                $("#calculateTotals").append(html);
+            });
+        </script>
+    }
+
+</section>

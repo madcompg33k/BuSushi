@@ -1,0 +1,64 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Manage Addresses";
+
+    var addrGrid = new WebGrid(_common.getAllAddresses(), rowsPerPage: 15);
+    var custAddrGrid = new WebGrid(_common.getAllCustomerAddresses(), rowsPerPage: 15);
+}
+
+<section id="manageAddresses">
+    <header>
+        <h3><a href="~/admin">&larr;</a>@Page.Title</h3> <small><a href="~/admin/modifyAddress/">Add New</a></small>
+    </header>
+
+    <div>
+        <header>Addresses</header>
+        @addrGrid.GetHtml(
+            tableStyle: "webGrid",
+            headerStyle: "head",
+            alternatingRowStyle: "alt",
+            columns: addrGrid.Columns(
+                addrGrid.Column("pkAddressId", "Address Id"),
+                addrGrid.Column("Address1", "Address 1"),
+                addrGrid.Column("Address2", "Address2"),
+                addrGrid.Column("AddrCity.CityName", "City"),
+                addrGrid.Column("AddrCity.CState.StateAbbreviation", "State"),
+                addrGrid.Column("AddrCity.ZipCode", "Zip"),
+                addrGrid.Column("",
+                    style: "options",
+                    format:
+                        @<text>
+                            <a href="@Href("~/admin/modifyAddress", item.pkAddressId)">Edit</a>
+                            @if(Roles.IsUserInRole("Master")){<a href="~/admin/deleteAddressConfirm/@item.pkAddressId" class="deleteButton">(Delete)</a>}
+                        </text>)
+            )
+        )
+    </div>
+
+    <div>
+        <header>Customer Addresses</header>
+        @custAddrGrid.GetHtml(
+            tableStyle: "webGrid",
+            headerStyle: "head",
+            alternatingRowStyle: "alt",
+            columns: custAddrGrid.Columns(
+                custAddrGrid.Column("fkCustomerId", "Customer Id"),
+                custAddrGrid.Column("pkAddressId", "Address Id"),
+                custAddrGrid.Column("pkAddressLookupId", "Lookup Id"),
+                custAddrGrid.Column("Nickname"),
+                custAddrGrid.Column("Address1", "Address 1"),
+                custAddrGrid.Column("Address2", "Address2"),
+                custAddrGrid.Column("AddrCity.CityName", "City"),
+                custAddrGrid.Column("AddrCity.CState.StateAbbreviation", "State"),
+                custAddrGrid.Column("AddrCity.ZipCode", "Zip"),
+                custAddrGrid.Column("",
+                    style: "options",
+                    format:
+                        @<text>
+                            <a href="@Href("~/admin/viewCustomerAddress", item.pkAddressId)">Edit</a>
+                            @if(Roles.IsUserInRole("Master")){<a href="~/admin/deleteAddressConfirm/@item.pkAddressId" class="deleteButton">(Delete)</a>}
+                        </text>)
+            )
+        )
+    </div>
+</section>

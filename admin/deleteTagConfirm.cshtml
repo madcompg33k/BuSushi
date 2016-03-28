@@ -1,0 +1,51 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Delete Tag";
+
+    if (!Roles.IsUserInRole("Master")){
+        Response.Redirect("~/");
+    }
+
+    var id = UrlData[0].AsInt();
+    
+    Tag currentItem;
+    
+    if(id != null){currentItem = new Tag(id);}
+    else{
+        currentItem = new Tag();
+        Response.Redirect("~/admin/");
+    }
+
+    var db = Database.Open("buSushi");
+    var sql = db.Query(@"SELECT tl.fkTagId, p.Name
+                            FROM TagLookup tl
+                            LEFT JOIN Products p
+                            ON p.pkId = tl.fkProductId
+                            WHERE tl.fkTagId = @0", id);
+}
+    
+
+<section id="deleteTag">
+    <header>
+        <h3>Delete Tag (@currentItem.TagName)</h3>
+    </header>
+
+    @if(sql.Count() > 0){
+        <h2>You may not delete this tag, it is referenced by other items.</h2>
+        <p>Items referencing this tag:</p>
+        <ul>
+            @foreach(var item in sql){
+                <li>@item.Name</li>
+            }
+        </ul>
+        <a href="~/admin/">&larr; Go Back</a>
+    }else{
+        <form id="frmDelete" method="delete" action="~/admin/deleteTag/@id">
+            <h2>Are you sure you want to delete @currentItem.TagName? (ID: @currentItem.pkTagId)</h2>
+            <small>(This action is irreversible)</small>
+
+            <input type="submit" value="Yes" />
+            <button formaction="~/admin/">No</button>
+        </form>
+    }
+</section>

@@ -1,0 +1,18 @@
+﻿@{
+    if (!Roles.IsUserInRole("Master")){Response.Redirect("~/");}
+
+    var Id = UrlData[0].AsInt();
+    Discount currentItem;
+
+    if(Id != null){
+        currentItem = new Discount(Id);
+        currentItem.deleteDiscount();
+        Response.Redirect(Href("~/admin/deleteComplete", true, "discounts"));
+    }
+    else{
+        currentItem = new Discount();
+        Response.Redirect(Href("~/admin/deleteComplete", false, "discounts"));
+    }
+
+}
+

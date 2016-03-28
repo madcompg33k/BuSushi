@@ -1,0 +1,53 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Delete Customer";
+
+    if (!Roles.IsUserInRole("Master")){
+        Response.Redirect("~/");
+    }
+
+    var id = UrlData[0].AsInt();
+    
+    Customer currentItem;
+    
+    if(id != null){currentItem = new Customer(id);}
+    else{
+        currentItem = new Customer();
+        Response.Redirect("~/admin/");
+    }
+    /*
+    var db = Database.Open("buSushi");
+    var cartQuery = db.Query(@"SELECT p.Name FROM CartItems ci
+                                INNER JOIN Products p ON p.pkId = ci.fkProductId
+                                WHERE p.pkId = @0", currentItem.pkProductId);
+    var orderQuery = db.Query(@"SELECT p.Name FROM OrderItems oi
+                                INNER JOIN Products p ON p.pkId = oi.fkProductId
+                                WHERE p.pkId = @0", currentItem.pkProductId);
+    */
+}
+    
+
+<section id="deleteCustomer">
+    <header>
+        <h3>Delete Customer (@currentItem.Username)</h3>
+    </header>
+
+    @*if(cartQuery.Any() || orderQuery.Any()){
+        <div>
+            We're sorry but this item is referenced by other items. Please remove this reference before
+            deleting this item.
+            <br />
+            <p><a href="@Href("~/admin/manageProducts")">Return</a></p>
+            
+        </div>
+    }else{*@
+        <form id="frmDelete" method="post" action="@Href("~/admin/deleteCustomer", id)">
+            <h2>Are you sure you want to delete @currentItem.Username? (ID: @currentItem.pkCustomerId)</h2>
+            <small>(This action is irreversible)</small>
+
+            <input type="submit" value="Yes" />
+            <button formaction="~/admin/">No</button>
+        </form>
+    @*}*@
+    
+</section>

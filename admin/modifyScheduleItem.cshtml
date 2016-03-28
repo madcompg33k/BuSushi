@@ -1,0 +1,69 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Schedule Item";
+
+    var Id = UrlData[0].AsInt();
+    var hasId = !string.IsNullOrEmpty(UrlData[0]);
+
+    DeliveryScheduleItem item = null;
+    
+    if(hasId){
+        item = new DeliveryScheduleItem(Id);
+    } else{item = new DeliveryScheduleItem();}
+
+    // Setup validation
+    Validation.RequireField("date", "You must specify a cooking style.");
+
+    if (IsPost && Validation.IsValid()) {
+        item.DeliveryDate= Request["date"].AsDateTime();
+        item.DCity = new City(Request["city"].AsInt());
+      
+
+        if(ModelState.IsValid){
+            if(hasId){item.modifyDeliveryScheduleItem();}
+            else{item.addDeliveryScheduleItem();}
+        }
+
+        Response.Redirect("~/admin/manageSchedule/");
+        
+    }
+}
+
+<script type="text/javascript">
+    $(function () {
+        $("#date").datepicker({ minDate: 0 }).datepicker(function(){
+            $("#date").datepicker("option", "dateFormat", 'mm/dd/yy');
+        });
+        
+    });
+</script>
+    
+
+<section id="modifySchedule">
+    <header>
+        <h3><a href="~/admin/manageSchedule/" class="arrow">&larr;</a>
+            @{if(hasId){<text>Modify</text>}else{<text>Add</text>}}
+            @Page.Title
+        </h3>
+    </header>
+
+    <form id="frmModify" method="post" action="">
+        <ul>
+            <li>
+                <label for="date">Date:</label>
+                <input type="text" id="date" name="date" value="@(((DateTime)item.DeliveryDate).ToShortDateString())" @Validation.For("date") />
+                <div>@Html.ValidationMessage("date")</div>
+            </li>
+
+            <li>
+                @Helpers.cities(item.DCity)
+            </li>
+
+            <li class="actions">
+                <input type="submit" value="@{if(hasId){<text>Save Changes</text>}else{<text>Add New</text>}}" />
+                <button formaction="~/admin/manageSchedule">Cancel</button>
+                @if(Roles.IsUserInRole("Master") && hasId){<button formaction="~/admin/deleteScheduleItemConfirm/@Id" class="deleteButton">Delete</button>}
+            </li>
+        </ul>
+    </form>
+</section>

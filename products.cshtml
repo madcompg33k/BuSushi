@@ -1,0 +1,140 @@
+﻿@{
+    Layout = "~/_SiteLayout.cshtml";
+    Page.Title = "Our Products";
+
+    var ProductType = UrlData[0];
+
+    Customer currentCustomer = _common.getCustomer();
+    CartItem cartItem = new CartItem();
+    if (IsPost && WebSecurity.CurrentUserId != -1 && Validation.IsValid()) {
+        /* Set Data */
+        
+        cartItem.fkCartId = currentCustomer.UserCart.pkCartId;
+        
+        var type = _common.getItemTypeByProductId(Request["productId"].AsInt());
+        if(string.Equals(type, "Roll")){cartItem.CIProduct = _common.getRollProduct(Request["productId"].AsInt());}
+        else if (string.Equals(type, "Sushi")){cartItem.CIProduct = _common.getSushiProduct(Request["productId"].AsInt());}
+        else if (string.Equals(type, "Food")){cartItem.CIProduct = _common.getFoodProduct(Request["productId"].AsInt());}
+        else { cartItem.CIProduct = new Product(Request["productId"].AsInt());}
+
+
+        cartItem.Qty = 1;
+        cartItem.Price = cartItem.CIProduct.Price;
+
+        if(cartItem.CIProduct.isSpecial()){
+            cartItem.CIDiscount = _common.getDiscountByCode("SPECIAL");
+            cartItem.CIDiscount.getDiscountDollar(cartItem.Price);
+        }
+
+        cartItem.Price -= cartItem.CIDiscount.DiscountDollar;
+        cartItem.ItemProfit = cartItem.calculateProfit();
+
+        /* Add item to cart */
+        cartItem.addCartItem();
+
+        /* Send user to their cart */
+        Response.Redirect("~/reviewCart");
+    }
+}
+
+<script>
+    $(function () {
+        var $collapsibleMenu = $(".collapsibleMenuItem");
+        var $collapsibleMenuItem = $(".collapsibleMenuItem nav ul li a");
+
+        var $rightPulloutMenu = $(".right-pullout-menu");
+        var $rightPulloutMenuItem = $(".right-pullout-menu nav ul li a");
+
+        $(".collapsibleMenuItem, .collapsibleMenuItem>nav:first-of-type").click(function () {
+            $(this).find("nav:first-of-type").slideToggle(100);
+            $(this).find(".up-arrow, .down-arrow").toggle();
+        });
+    });
+</script>
+
+<section id="products">
+    <header>
+        <h3>@Page.Title</h3>
+    </header>
+
+    @*
+    <aside class="product-tree">
+        <div>
+            <header>Product Types</header>
+            <nav>
+                <ul class="products">
+                    <li>
+                        <a href="~/products/">All Products &rarr;</a>
+                    </li>
+                        @foreach(var product in _common.getProductTypes()){
+                            <li class="collapsibleMenuItem">
+                                <header>
+                                    <a href="@Href("~/products", product.ProductTypeName.ToLower())">
+                                        @product.ProductTypeName
+                                        <span class="down-arrow">&#9660;</span>
+                                        <span class="up-arrow">&#9650;</span>
+                                    </a>
+                                </header>
+                                <nav>
+                                    @if(string.Equals(product.ProductTypeName.ToLower(), "food")){
+                                        <ul class="sub-menu">
+                                            <li><a href="@Href("~/products", "food")">All Food &rarr;</a></li>
+                                            @foreach(var food in _common.getFoodTypes()){
+                                                <li class="collapsibleMenuItem">
+                                                    <header>
+                                                        <a href="@Href("~/products", food.FoodTypeName.ToLower())">
+                                                            @food.FoodTypeName
+                                                            <span class="down-arrow">&#9660;</span>
+                                                            <span class="up-arrow">&#9650;</span>
+                                                        </a>
+                                                    </header>
+                                                    <nav>
+                                                        @if(string.Equals(food.FoodTypeName.ToLower(), "sushi")){
+                                                            <ul>
+                                                                @foreach(var sushi in _common.getSushiTypes()){
+                                                                    <li>
+                                                                        <a href="@Href("~/products", sushi.SushiTypeName.ToLower())">@sushi.SushiTypeName</a>
+                                                                        @if(string.Equals(sushi.SushiTypeName.ToLower(), "roll")){
+                                                                            <ul>
+                                                                                @foreach(var roll in _common.getRollTypes()){
+                                                                                    <li><a href="@Href("~/products", roll.RollTypeName.ToLower())">@roll.RollTypeName</a></li>
+                                                                                }
+                                                                            </ul>
+                                                                        }
+                                                                    </li>
+                                                                }
+                                                            </ul>
+                                                        }
+                                                    </nav>
+                                                </li>
+                                            }
+                                        </ul>
+                                    }
+                                </nav>
+                            </li>
+                        }
+                </ul>
+            </nav>
+        </div>
+    </aside>
+    *@
+    <div>
+        @*
+        <p class="options">
+            @Helpers.productTypes()
+            @Helpers.foodTypes()
+            @Helpers.sushiTypes()
+            @Helpers.rollTypes()
+        </p>
+        *@
+        @if(string.Equals(ProductType, "roll") || string.Equals(ProductType, "rolls")){
+            foreach(Roll r in _common.getActiveRolls()){@Helpers.showProduct(r)}
+        } else if(string.Equals(ProductType, "sushi")){
+            foreach(Sushi s in _common.getActiveSushi()){@Helpers.showProduct(s)}
+        } else if(string.Equals(ProductType, "food")){
+            foreach(Food f in _common.getActiveFood()){@Helpers.showProduct(f)}
+        } else{
+            foreach(Product p in _common.getAllProducts()){@Helpers.showProduct(p)}
+        }
+    </div>
+</section>

@@ -1,0 +1,25 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Ban User";
+
+    var id = UrlData[0].AsInt();
+    
+    Customer currentItem = null;
+    if(id != null){currentItem = new Customer(id);}
+    else{Response.Redirect("~/admin/");}
+
+}
+    
+
+<section id="banUser">
+    <header>
+        <h3>Ban User (@currentItem.Username)</h3>
+    </header>
+
+    <form id="frmBan" action="~/admin/banUser/@id">
+        <h2>Are you sure you want to ban @currentItem.Username? (ID: @currentItem.UserId)</h2>
+
+        <input type="submit" value="Yes" />
+        <button formaction="~/admin/viewCustomer/@id">No</button>
+    </form>
+</section>

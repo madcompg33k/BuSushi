@@ -1,0 +1,655 @@
+﻿@functions{
+    public static bool IsBeforeToday(string value){
+        DateTime result;
+        if (DateTime.TryParse(value.ToString(), out result)){
+            if (result < DateTime.Now){return true;}
+        } return false;
+    }
+
+    public static Customer getCustomer(){
+        Customer c = null;
+        if(WebSecurity.CurrentUserId != -1){
+            c = new Customer(WebSecurity.CurrentUserId);
+            /* Check if customer currently has an open cart */
+            if(c.UserCart.pkCartId == 0){c.UserCart.addCart();}
+        }
+        else{c = new Customer();}
+        return c;
+    }
+
+    public static dynamic dbQuery(string query){
+        var db = Database.Open("buSushi");
+        var result = db.Query(query);
+        db.Close();
+
+        return result;
+    }
+
+    public static string getItemTypeByProductId(int Id){
+        var itemType = "Product";
+        var db = Database.Open("buSushi");
+
+        var sql = @"SELECT pt.ProductTypeName, ft.FoodTypeName, st.SushiTypeName FROM ProductTypes pt
+                        LEFT JOIN Products p ON p.Type = pt.pkProductTypeId
+                        LEFT JOIN Food f ON f.fkProductId = p.pkId
+                        LEFT JOIN FoodTypes ft ON ft.pkFoodTypeId = f.fkFoodTypeId
+                        LEFT JOIN Sushi s ON s.fkFoodId = f.pkFoodId
+                        LEFT JOIN SushiTypes st ON st.pkSushiTypeId = s.fkSushiTypeId
+                    WHERE p.pkId = @0";
+        var query = db.QuerySingle(sql, Id);
+
+        /* Query is null, just return product */
+        if(query == null){return "Product";}
+
+        if(query.SushiTypeName != null && string.Equals(query.SushiTypeName, "Roll")){
+            itemType = query.SushiTypeName;
+        }else if (query.FoodTypeName != null && string.Equals(query.FoodTypeName, "Sushi")){
+            itemType = query.FoodTypeName;
+        } else if (query.ProductTypeName != null && string.Equals(query.ProductTypeName, "Food")){
+            itemType = query.ProductTypeName;
+        }
+
+        return itemType;
+    }
+
+    public static Cart getCartByUserId(int Id){
+        Cart cart = new Cart();
+
+        var db = Database.Open("buSushi");
+        dynamic sql = db.QuerySingle("SELECT * FROM Cart WHERE fkUserId = " + Id);
+
+        cart.pkCartId = sql.pkCartId;
+        cart.fkUserId = Id;
+        cart.DateCreated = sql.DateCreated;
+        cart.CheckedOut = sql.CheckedOut;
+
+        List<CartItem> items = getCartProductsByCartId(cart.pkCartId);
+        foreach(var row in items){cart.CartItems.Add(row);}
+
+        items = getCartRollsByCartId(cart.pkCartId);
+        foreach(var row in items){cart.CartItems.Add(row);}
+
+        db.Close();
+        return cart;
+    }
+
+    public static List<CartItem> getCartProductsByCartId(int Id){
+        List<CartItem> items = new List<CartItem>();
+        var db = Database.Open("buSushi");
+        var query = db.Query("SELECT pkCartItemId FROM CartItems WHERE fkProductId IS NOT NULL AND fkCartId = @0", Id);
+        foreach(var row in query){items.Add(new CartItem(row.pkCartItemId));}
+        
+        return items;
+    }
+
+    public static List<CartItem> getCartRollsByCartId(int Id){
+        List<CartItem>items = new List<CartItem>();
+        var db = Database.Open("buSushi");
+        var query = db.Query("SELECT pkCartItemId FROM CartItems WHERE fkRollId IS NOT NULL AND fkCartId = @0", Id);
+        foreach(var row in query){items.Add(new CartItem(row.pkCartItemId));}
+        return items;
+    }
+
+    /*
+    public static List<Roll> getRollsByCartId(int Id){
+        List<Roll>items = new List<Roll>();
+        var db = Database.Open("buSushi");
+        var query = db.Query(@"SELECT r.pkRollId, c.pkCartId FROM Rolls r
+                                INNER JOIN Sushi s ON s.pkSushiId = r.fkSushiId
+                                INNER JOIN Food f ON f.pkFoodId = s.fkFoodId
+                                INNER JOIN Products p ON p.pkId = f.fkProductId
+                                INNER JOIN CartItems ci ON ci.fkProductId = p.pkId
+                                INNER JOIN Cart c ON c.pkCartId = ci.fkCartId
+                                WHERE fkCartId = @0", Id);
+        foreach(var row in query){items.Add(new Roll(row.pkRollId));}
+        return items;
+    }
+    */
+
+    public static List<CustomerRoll> getAllCustomerRolls(){
+        List<CustomerRoll>items = new List<CustomerRoll>();
+        var db = Database.Open("buSushi");
+        var query = db.Query(@"SELECT pkRollId FROM CustomerRolls");
+        foreach(var row in query){items.Add(new CustomerRoll(row.pkRollId));}
+        return items;
+    }
+
+    public static List<CustomerRoll> getCustomerRollsByCartId(int Id){
+        List<CustomerRoll>items = new List<CustomerRoll>();
+        var db = Database.Open("buSushi");
+        var query = db.Query(@"SELECT cr.pkRollId, c.pkCartId FROM CustomerRolls cr
+                            INNER JOIN CartItems ci ON ci.fkRollId = cr.pkRollId
+                            INNER JOIN Cart c ON c.pkCartId = ci.fkCartId
+                            WHERE c.pkCartId = @0", Id);
+        foreach(var row in query){items.Add(new CustomerRoll(row.pkRollId));}
+        return items;
+    }
+
+    public static int getTotalItemsInCart(int cartId, int userId){
+        int qty = new int();
+
+        var db = Database.Open("buSushi");
+        var sql = db.QueryValue(@"SELECT SUM(ci.Qty) AS TotalItems FROM CartItems ci
+                                INNER JOIN Cart c ON c.pkCartId = ci.fkCartId
+                                WHERE ci.fkCartId = @0 AND c.fkUserId = @1", cartId, userId);
+        db.Close();
+
+        qty = sql == DBNull.Value ? 0 : Convert.ToInt32(sql);
+
+        return qty;
+    }
+
+    public static int getProductQtyInCart(int productId, int cartId, int userId){
+        int qty = new int();
+
+        var db = Database.Open("buSushi");
+        var sql = db.QueryValue(@"SELECT Qty
+                                FROM CartItems ci
+                                INNER JOIN Cart c
+                                ON c.pkCartId = ci.fkCartId
+                                WHERE fkProductId = @0 AND ci.fkCartId = @1 AND c.fkUserId = @2", productId, cartId, userId);
+        db.Close();
+
+        qty = sql == DBNull.Value ? 0 : Convert.ToInt32(sql);
+
+        return qty;
+    }
+
+    public static int getCartItemIdByProductUserId(int productId, int userId){
+        var db = Database.Open("buSushi");
+        var Id = db.QueryValue(@"SELECT ci.pkCartItemId FROM CartItems ci
+                                INNER JOIN Cart c ON c.pkCartId = ci.fkCartId
+                                WHERE ci.fkProductId = @0 AND c.fkUserId = @1", productId, userId);
+        db.Close();
+        return Id == null ? 0 : Id;
+    }
+
+
+    public static List<OrderOption> getAllOrderOptions(){
+        List<OrderOption>items = new List<OrderOption>();
+        var db = Database.Open("buSushi");
+        var query = db.Query(@"SELECT pkOptionId FROM OrderOptions");
+        foreach(var row in query){items.Add(new OrderOption(row.pkOptionId));}
+        return items;
+    }
+
+
+    /* <===PRODUCTS===> */
+    public static List<Product> getAllProducts(){
+        List<Product>items = new List<Product>();
+        var db = Database.Open("buSushi");
+        dynamic products = db.Query(@"SELECT p.pkId, p.Name, p.Type, sl.SpecialEndDate, f.fkFoodTypeId, s.fkSushiTypeId, r.fkRollTypeId
+                                        FROM Products p
+                                        LEFT JOIN Specials_Lookup sl ON sl.fkProductId = p.pkId
+                                        LEFT JOIN Food f ON f.fkProductId = p.pkId
+                                        LEFT JOIN Sushi s ON s.fkFoodId = f.pkFoodId
+                                        LEFT JOIN Rolls r ON r.fkSushiId = s.pkSushiId
+                                        ORDER BY SpecialEndDate DESC, Type DESC, fkFoodTypeId DESC, fkSushiTypeId DESC, fkRollTypeId ASC, Name ASC");
+        foreach(var row in products){items.Add(new Product(row.pkId));}
+        return items;
+    }
+
+    public static List<Product> getActiveProducts(){
+        List<Product>items = new List<Product>();
+        var db = Database.Open("buSushi");
+        dynamic query = db.Query(@"SELECT pkId, discontinued FROM Products WHERE discontinued = 'False'");
+        foreach(var row in query){items.Add(new Product(row.pkId));}
+        return items;
+    }
+
+    public static List<Product> getProductSpecials(){
+        List<Product> items = new List<Product>();
+        var db = Database.Open("BuSushi");
+        var query = db.Query(@"SELECT p.pkId, sl.SpecialBeginDate, sl.SpecialEndDate FROM Products p 
+                                INNER JOIN Specials_Lookup sl ON sl.fkProductId = p.pkId
+                                WHERE discontinued = 'False'
+                                AND sl.SpecialBeginDate <= @0
+                                AND (sl.SpecialEndDate >= @0 OR sl.SpecialEndDate IS NULL)", DateTime.Now);
+        foreach(var row in query){items.Add(new Product(row.pkId));}
+        return items;
+    }
+
+    public static List<CustomerRoll> getCustomerRollSpecials(){
+        List<CustomerRoll> items = new List<CustomerRoll>();
+        var db = Database.Open("BuSushi");
+        var query = db.Query(@"SELECT cr.pkRollId, sl.SpecialBeginDate, sl.SpecialEndDate FROM CustomerRolls cr 
+                                INNER JOIN Specials_Lookup sl ON sl.fkRollId = cr.pkRollId
+                                WHERE sl.SpecialBeginDate <= @0
+                                AND (sl.SpecialEndDate >= @0 OR sl.SpecialEndDate IS NULL)", DateTime.Now);
+        foreach(var row in query){items.Add(new CustomerRoll(row.pkRollId));}
+        return items;
+    }
+
+    public static List<ProductType> getProductTypes(){
+        List<ProductType> items = new List<ProductType>();
+        var db = Database.Open("BuSushi");
+        var sql = db.Query("SELECT pkProductTypeId FROM ProductTypes");
+        foreach(var row in sql){items.Add(new ProductType(row.pkProductTypeId));}
+        return items;
+    }
+
+    public static List<ProductOption> getAllProductOptions(){
+        List<ProductOption>items = new List<ProductOption>();
+        var db = Database.Open("buSushi");
+        var query = db.Query("SELECT pkProductOptionId FROM ProductOptions");
+        foreach(var row in query){items.Add(new ProductOption(row.pkProductOptionId));}
+        return items;
+    }
+
+    public static List<ProductOptionGroup> getAllProductOptionsGroups(){
+        List<ProductOptionGroup>items = new List<ProductOptionGroup>();
+        var db = Database.Open("BuSushi");
+        var query = db.Query("SELECT pkProductOptionGroupId FROM ProductOptionGroups");
+        foreach(var row in query){items.Add(new ProductOptionGroup(row.pkProductOptionGroupId));}
+        return items;
+    }
+    /* <===/PRODUCTS===> */
+
+    /* <===FOOD===> */
+    public static List<Food> getAllFood(){
+        List<Food>items = new List<Food>();
+        var db = Database.Open("buSushi");
+        var sql = db.Query("SELECT pkFoodId, fkProductId FROM Food");
+        foreach(var row in sql){items.Add(new Food(row.pkFoodId, row.fkProductId));}
+        return items;
+    }
+
+    public static List<Food> getActiveFood(){
+        List<Food>items = new List<Food>();
+        var db = Database.Open("buSushi");
+        var sql = db.Query(@"SELECT p.discontinued, f.pkFoodId, f.fkProductId FROM Food f
+                             INNER JOIN Products p
+                             ON p.pkId = f.fkProductId
+                             WHERE p.discontinued = 'False'");
+        foreach(var row in sql){items.Add(new Food(row.pkFoodId, row.fkProductId));}
+        return items;
+    }
+
+    public static Food getFoodProduct(int ProductId){
+        Food f = new Food();
+        var db = Database.Open("buSushi");
+        var query = db.QuerySingle(@"SELECT pkFoodId, fkProductId FROM Food WHERE fkProductId = @0", ProductId);
+        if(query != null){f = new Food(query.pkFoodId, query.fkProductId);}
+        return f;
+    }
+
+    public static List<FoodType> getFoodTypes(){
+        List<FoodType> items = new List<FoodType>();
+        var db = Database.Open("BuSushi");
+        var sql = db.Query("SELECT pkFoodTypeId FROM FoodTypes");
+        foreach(var row in sql){items.Add(new FoodType(row.pkFoodTypeId));}
+        return items;
+    }
+    /* <===/FOOD===> */
+
+    /* <===SUSHI===> */
+    public static List<Sushi> getAllSushi(){
+        List<Sushi>items = new List<Sushi>();
+        var db = Database.Open("buSushi");
+        var sql = db.Query(@"SELECT s.pkSushiId, s.fkFoodId, f.fkProductId FROM Sushi s
+                                INNER JOIN Food f
+                                ON f.pkFoodId = s.fkFoodId");
+        foreach(var row in sql){items.Add(new Sushi(row.pkSushiId, row.fkFoodId, row.fkProductId));}
+        return items;
+    }
+
+    public static List<Sushi> getActiveSushi(){
+        List<Sushi>items = new List<Sushi>();
+        var db = Database.Open("buSushi");
+        var sql = db.Query(@"SELECT s.pkSushiId, s.fkFoodId, f.fkProductId, p.discontinued FROM Sushi s
+                                INNER JOIN Food f
+                                ON f.pkFoodId = s.fkFoodId
+                                INNER JOIN Products p
+                                ON p.pkId = f.fkProductId
+                                WHERE p.discontinued = 'False'");
+        foreach(var row in sql){items.Add(new Sushi(row.pkSushiId, row.fkFoodId, row.fkProductId));}
+        return items;
+    }
+
+    public static Sushi getSushiProduct(int ProductId){
+        var db = Database.Open("buSushi");
+        var query = db.QuerySingle(@"SELECT s.pkSushiId, s.fkFoodId, f.fkProductId FROM Sushi s
+                        INNER JOIN Food f
+                        ON f.pkFoodId = s.fkFoodId
+                        WHERE f.fkProductId = @0", ProductId);
+        Sushi s = new Sushi(query.pkSushiId, query.fkFoodId, query.fkProductId);
+        return s;
+    }
+
+    public static List<SushiType> getSushiTypes(){
+        List<SushiType> items = new List<SushiType>();
+        var db = Database.Open("BuSushi");
+        var sql = db.Query("SELECT pkSushiTypeId FROM SushiTypes");
+        foreach(var row in sql){items.Add(new SushiType(row.pkSushiTypeId));}
+        return items;
+    }
+    /* <===/SUSHI===> */
+
+    /* <===ROLL===> */
+    public static List<Roll> getAllRolls(){
+        List<Roll>items = new List<Roll>();
+        var db = Database.Open("buSushi");
+        var sql = db.Query(@"SELECT r.pkRollId, r.fkSushiId, s.fkFoodId, f.fkProductId FROM Rolls r
+                                INNER JOIN Sushi s
+                                ON s.pkSushiId = r.fkSushiId
+                                INNER JOIN Food f
+                                ON f.pkFoodId = s.fkFoodId");
+        foreach(var row in sql){items.Add(new Roll(row.pkRollId, row.fkSushiId, row.fkFoodId, row.fkProductId));}
+        return items;
+    }
+
+    public static List<Roll> getActiveRolls(){
+        List<Roll>items = new List<Roll>();
+        var db = Database.Open("buSushi");
+        var sql = db.Query(@"SELECT r.pkRollId, r.fkSushiId, s.fkFoodId, f.fkProductId, p.discontinued FROM Rolls r
+                                INNER JOIN Sushi s
+                                ON s.pkSushiId = r.fkSushiId
+                                INNER JOIN Food f
+                                ON f.pkFoodId = s.fkFoodId
+                                INNER JOIN Products p
+                                ON p.pkId = f.fkProductId
+                                WHERE p.discontinued = 'False'");
+        foreach(var row in sql){items.Add(new Roll(row.pkRollId, row.fkSushiId, row.fkFoodId, row.fkProductId));}
+        return items;
+    }
+
+    public static Roll getRollProduct(int ProductId){
+        Roll r = new Roll();
+        var db = Database.Open("buSushi");
+        var query = db.QuerySingle(@"SELECT r.pkRollId, r.fkSushiId, s.fkFoodId, f.fkProductId FROM Rolls r
+                        INNER JOIN Sushi s
+                        ON s.pkSushiId = r.fkSushiId
+                        INNER JOIN Food f
+                        ON f.pkFoodId = s.fkFoodId
+                        WHERE f.fkProductId = @0", ProductId);
+        if(query != null){
+            r = new Roll(query.pkRollId, query.fkSushiId, query.fkFoodId, query.fkProductId);
+        }
+        return r;
+    }
+
+    public static List<RollType> getRollTypes(){
+        List<RollType> items = new List<RollType>();
+        var db = Database.Open("BuSushi");
+        var sql = db.Query("SELECT pkRollTypeId FROM RollTypes");
+        foreach(var row in sql){items.Add(new RollType(row.pkRollTypeId));}
+        return items;
+    }
+    /* <===/ROLL===> */
+
+
+    /* <===INGREDIENTS===> */
+
+    public static List<IngredientGroup> getIngredientGroups(){
+        List<IngredientGroup>items = new List<IngredientGroup>();
+        var db = Database.Open("buSushi");
+        var groups = db.Query("SELECT pkGroupId FROM IngredientGroups ORDER BY pkGroupId ASC");
+        foreach(var row in groups){items.Add(new IngredientGroup(row.pkGroupId));}
+        return items;
+    }
+
+    public static List<Ingredient> getAllIngredients(){
+        List<Ingredient>items = new List<Ingredient>();
+        var db = Database.Open("buSushi");
+        var ingredients = db.Query(@"SELECT pkIngredientId FROM Ingredients ORDER BY fkGroupId ASC, IngredientName ASC");
+        foreach(var row in ingredients){items.Add(new Ingredient(row.pkIngredientId));}
+        return items;
+    }
+
+
+    public static List<Ingredient> getAllIngredientsInGroup(int groupId){
+        List<Ingredient>items = new List<Ingredient>();
+        var db = Database.Open("buSushi");
+        var ingredients = db.Query(@"SELECT pkIngredientId, fkGroupId, Active, IngredientName FROM Ingredients
+                            WHERE Active = 'True' AND fkGroupId = @0 ORDER BY fkGroupId ASC, IngredientName ASC", groupId);
+        foreach(var row in ingredients){items.Add(new Ingredient(row.pkIngredientId));}
+        return items;
+    }
+
+    public static List<Ingredient> getInsideIngredientsInGroup(int groupId){
+        List<Ingredient>items = new List<Ingredient>();
+        var db = Database.Open("buSushi");
+        var ingredients = db.Query(@"SELECT pkIngredientId, fkGroupId, Active, IngredientName FROM Ingredients
+                            WHERE Active = 'True' AND MakeARollIngredient = 'True' AND fkGroupId = @0
+                            ORDER BY fkGroupId ASC, IngredientName ASC", groupId);
+        foreach(var row in ingredients){items.Add(new Ingredient(row.pkIngredientId));}
+        return items;
+    }
+
+
+    public static List<Ingredient> getTopIngredientsInGroup(int groupId){
+        List<Ingredient>items = new List<Ingredient>();
+        var db = Database.Open("buSushi");
+        var ingredients = db.Query(@"SELECT pkIngredientId, fkGroupId, Active, IngredientName, TopIngredient FROM Ingredients
+                            WHERE Active = 'True' AND MakeARollIngredient = 'True' AND fkGroupId = @0 AND TopIngredient = 1
+                            ORDER BY fkGroupId ASC, IngredientName ASC", groupId);
+        foreach(var row in ingredients){items.Add(new Ingredient(row.pkIngredientId));}
+        return items;
+    }
+
+    public static List<Ingredient> getIngredientsByFoodId(int Id){
+        List<Ingredient> items = new List<Ingredient>();
+        var db = Database.Open("buSushi");
+        var ingredients = db.Query(@"SELECT i.pkIngredientId FROM Ingredients i
+                                     INNER JOIN FoodIngredientLookup fil ON fil.fkIngredientId = i.pkIngredientId
+                                     INNER JOIN Food f ON s.pkFoodId = sil.fkFoodId
+                                     WHERE f.pkFoodId = @0", Id);
+        foreach(var row in ingredients){items.Add(new Ingredient(row.pkIngredientId));}
+        return items;
+    }
+
+
+    public static List<Ingredient> getIngredientsByRollId(int Id){
+        List<Ingredient> items = new List<Ingredient>();
+        var db = Database.Open("buSushi");
+        var query = db.Query(@"SELECT i.pkIngredientId FROM Ingredients i
+                                     INNER JOIN FoodIngredientLookup fil ON fil.fkIngredientId = i.pkIngredientId
+                                     INNER JOIN Rolls r ON r.pkRollId = fil.fkRollId
+                                     WHERE r.pkRollId = @0", Id);
+        foreach(var row in query){items.Add(new Ingredient(row.pkIngredientId));}
+        return items;
+    }
+    /* <===/INGREDIENTS===> */
+
+
+    /* <===TAGS===> */
+    public static List<Tag> getAllTags(){
+        List<Tag>items = new List<Tag>();
+        var db = Database.Open("buSushi");
+        var itemDetails = db.Query("SELECT pkTagId FROM Tags ORDER BY Tag ASC");
+        foreach(var row in itemDetails){items.Add(new Tag(row.pkTagId));}
+        return items;
+    }
+
+    public static List<Tag> getTagsByProductId(int Id){
+        List<Tag> items = new List<Tag>();
+        var db = Database.Open("buSushi");
+        var tags = db.Query(@"SELECT t.pkTagId FROM Tags t
+                             INNER JOIN TagLookup tl ON tl.fkTagId = t.pkTagId
+                             WHERE tl.fkProductId = " + Id);
+        foreach(var t in tags){items.Add(new Tag(t.pkTagId));}
+        return items;
+    }
+
+    public static List<Tag> getTagsByCustomerRollId(int Id){
+        List<Tag> items = new List<Tag>();
+        var db = Database.Open("buSushi");
+        var tags = db.Query(@"SELECT t.pkTagId FROM Tags t
+                             INNER JOIN TagLookup tl ON tl.fkTagId = t.pkTagId
+                             WHERE tl.fkCustomerRollId = " + Id);
+        foreach(var t in tags){items.Add(new Tag(t.pkTagId));}
+        return items;
+    }
+    /* <===/TAGS===> */
+
+
+    /* <===ROLLS===> */
+
+    /* <===/ROLLS===> */
+
+
+    public static List<CookingStyle> getAllCookingStyles(){
+        List<CookingStyle>items = new List<CookingStyle>();
+        var db = Database.Open("buSushi");
+        var styles = db.Query("SELECT * FROM CookingStyles");
+        foreach(var row in styles){items.Add(new CookingStyle(row.pkCookingStyleId));}
+        return items;
+    }
+
+    public static List<CookingStyle> getCookingStylesByFoodId(int Id){
+        List<CookingStyle>items = new List<CookingStyle>();
+        var db = Database.Open("buSushi");
+        var query = db.Query(@"SELECT cs.pkCookingStyleId FROM CookingStyles cs
+                                    INNER JOIN CookingStyleLookup csl ON csl.fkCookingStyleId = cs.pkCookingStyleId
+                                    INNER JOIN Food f ON f.pkFoodId = csl.fkFoodId
+                                    WHERE f.pkFoodId = " + Id);
+        if(query.Any()){foreach(var row in query){items.Add(new CookingStyle(row.pkCookingStyleId));}}
+        return items;
+    }
+
+
+    /* <===SCHEDULE===> */
+    public static List<DeliveryScheduleItem> getAllScheduleItems(){
+        List<DeliveryScheduleItem>items = new List<DeliveryScheduleItem>();
+        var db = Database.Open("buSushi");
+        var query = db.Query(@"SELECT pkDeliveryId FROM DeliverySchedule");
+        if(query.Any()){foreach(var row in query){items.Add(new DeliveryScheduleItem(row.pkDeliveryId));}}
+        return items;
+    }
+
+    public static List<DeliveryScheduleItem> getScheduleItems(){
+        List<DeliveryScheduleItem>items = new List<DeliveryScheduleItem>();
+        var db = Database.Open("buSushi");
+        var query = db.Query("SELECT pkDeliveryId FROM DeliverySchedule WHERE DeliveryDate >= @0", DateTime.Today);
+        if(query.Any()){foreach(var row in query){items.Add(new DeliveryScheduleItem(row.pkDeliveryId));}}
+        return items;
+    }
+
+    public static List<DeliveryScheduleItem> getFutureScheduleItemsByCity(int Id){
+        List<DeliveryScheduleItem>items = new List<DeliveryScheduleItem>();
+        var db = Database.Open("buSushi");
+        var query = db.Query("SELECT pkDeliveryId FROM DeliverySchedule WHERE DeliveryDate > (getdate()) AND fkCityId = @0", Id);
+        if(query.Any()){foreach(var row in query){items.Add(new DeliveryScheduleItem(row.pkDeliveryId));}}
+        return items;
+    }
+
+
+    public static List<DeliveryScheduleItem> getScheduleByCity(int Id){
+        List<DeliveryScheduleItem>items = new List<DeliveryScheduleItem>();
+        var db = Database.Open("buSushi");
+        var query = db.Query("SELECT pkDeliveryId FROM DeliverySchedule WHERE DeliveryDate > @0 AND fkCityId = @1", DateTime.Today, Id);
+        if(query.Any()){foreach(var row in query){items.Add(new DeliveryScheduleItem(row.pkDeliveryId));}}
+        return items;
+    }
+    /* <===/SCHEDULE===> */
+
+    /* <===SECTION#LOCATIONS===> */
+    public static List<Address> getAllAddresses(){
+        List<Address>items = new List<Address>();
+        var db = Database.Open("buSushi");
+        var query = db.Query("SELECT pkAddressId FROM Addresses");
+        if(query.Any()){
+            foreach(var row in query){items.Add(new Address(row.pkAddressId));}
+        }
+        return items;
+    }
+
+    public static List<CustomerAddress> getAllCustomerAddresses(){
+        List<CustomerAddress>items = new List<CustomerAddress>();
+        var db = Database.Open("buSushi");
+        var query = db.Query("SELECT fkAddressId, fkCustomerId FROM AddressLookup");
+        if(query.Any()){
+            foreach(var row in query){items.Add(new CustomerAddress(row.fkAddressId, row.fkCustomerId));}
+        }
+        return items;
+    }
+
+    public static List<City> getCities(){
+        List<City>items = new List<City>();
+        var db = Database.Open("buSushi");
+        var query = db.Query("SELECT pkCityId FROM Cities");
+        if(query.Any()){foreach(var row in query){items.Add(new City(row.pkCityId));}}
+        return items;
+    }
+
+    public static List<State> getStates(){
+        List<State>items = new List<State>();
+        var db = Database.Open("buSushi");
+        var query = db.Query("SELECT pkStateId FROM States");
+        if(query.Any()){foreach(var row in query){items.Add(new State(row.pkStateId));}}
+        return items;
+    }
+    /* <===/SECTION#LOCATIONS===> */
+
+
+    public static List<Customer> getAllCustomers(){
+        List<Customer>items = new List<Customer>();
+        var db = Database.Open("buSushi");
+        var customers = db.Query(@"SELECT wm.UserId FROM Customers c
+                                    INNER JOIN webpages_Membership wm ON wm.UserId = c.fkUserId");
+        foreach (var row in customers){items.Add(new Customer(row.UserId));}
+        return items;
+    }
+
+    public static List<Role> getAllRoles(){
+        List<Role>items = new List<Role>();
+        var db = Database.Open("buSushi");
+        var query = db.Query(@"SELECT RoleId FROM webpages_Roles");
+        foreach(var row in query){items.Add(new Role(row.RoleId));}
+        return items;
+    }
+
+
+    /* <===SECTION#DISCOUNTS===> */
+    public static List<Discount> getAllDiscounts(){
+        List<Discount>items = new List<Discount>();
+        var db = Database.Open("buSushi");
+        var query = db.Query(@"SELECT pkDiscountId FROM Discounts");
+        foreach(var row in query){items.Add(new Discount(row.pkDiscountId));}
+        db.Close();
+        return items;
+    }
+
+    public static List<Discount> getActiveDiscounts(){
+        List<Discount>items = new List<Discount>();
+        var db = Database.Open("buSushi");
+        var query = db.Query(@"SELECT pkDiscountId FROM Discounts WHERE isActive = 'True'");
+        foreach(var row in query){items.Add(new Discount(row.pkDiscountId));}
+        db.Close();
+        return items;
+    }
+
+    public static Discount getDiscountByCode(string code){
+        var db = Database.Open("buSushi");
+        var query = db.QuerySingle("SELECT pkDiscountId FROM Discounts WHERE DiscountCode = @0", code.ToUpper());
+        Discount item;
+        if(query != null){
+            item = new Discount(query.pkDiscountId);
+        }
+        else{item = new Discount();}
+        db.Close();
+        return item;
+    }
+
+    public static List<DiscountType> getDiscountTypes(){
+        List<DiscountType> items = new List<DiscountType>();
+        var db = Database.Open("BuSushi");
+        var sql = db.Query("SELECT pkDiscountTypeId FROM DiscountTypes");
+        foreach(var row in sql){items.Add(new DiscountType(row.pkDiscountTypeId));}
+        db.Close();
+        return items;
+    }
+    /* <===/SECTION#DISCOUNTS===> */
+
+
+    public static List<PhoneType> getAllPhoneTypes(){
+        List<PhoneType>items = new List<PhoneType>();
+        var db = Database.Open("buSushi");
+        var query = db.Query("SELECT pkPhoneTypeId FROM PhoneTypes");
+        if(query.Any()){
+            foreach(var row in query){items.Add(new PhoneType(row.pkPhoneTypeId));}
+        }
+        db.Close();
+        return items;
+    }
+}

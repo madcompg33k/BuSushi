@@ -1,0 +1,16 @@
+﻿@{
+    if (!Roles.IsUserInRole("Master")){Response.Redirect("~/");}
+
+    var id = UrlData[0].AsInt();
+    DeliveryScheduleItem currentItem;
+
+    if(id != null){
+        currentItem = new DeliveryScheduleItem(id);
+        currentItem.deleteDeliveryScheduleItem();
+        Response.Redirect(Href("~/admin/deleteComplete", true, "schedule"));
+    }else{
+        currentItem = new DeliveryScheduleItem();
+        Response.Redirect(Href("~/admin/deleteComplete", false, "schedule"));
+    }
+
+}

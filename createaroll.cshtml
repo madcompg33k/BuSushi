@@ -1,0 +1,467 @@
+﻿@using System.Web.Script.Serialization;
+@{
+    Layout = "~/_SiteLayout.cshtml";
+    Page.Title = "Create-A-Roll";
+
+    Customer currentCustomer = _common.getCustomer();
+    CustomerRoll currentItem = new CustomerRoll();
+    CartItem cartItem = new CartItem();
+
+    /* Validation */
+    Validation.RequireField("rollType", "You must specify a roll type.");
+    Validation.RequireField("inside", "You must specify an ingredient inside.");
+    Validation.Add("rollQty",
+        Validator.Required("Please enter a quantity."),
+        Validator.Range(1, 6, "Please enter a qty between 1 and 6. For large orders, please check our catering section.")
+    );
+    Validation.RequireField(Request["saveRoll"] == "on" ? "rollName" : "rollPrice", "You must specify a roll name.");
+
+    /* Add customer roll and cartitem information */
+    if (IsPost && Validation.IsValid() && WebSecurity.CurrentUserId != -1){
+        /* Set roll type */
+        currentItem.RType = new RollType(Request["rollType"].AsInt());
+
+
+        /* If customer wants to save roll, add CustomerRollLookup information */
+        if (Request["saveRoll"] == "on"){
+            currentItem.fkCustomerId = currentCustomer.pkCustomerId;
+            currentItem.RollName = Request["rollName"];
+        }
+
+        /* Add top ingredients */
+        if(!Request["onTop"].IsEmpty()){
+            foreach (var selection in Request["onTop"].Split(',')){currentItem.IngredientsTop.Add(new Ingredient(selection.AsInt()));}
+        }
+        /* Add inside ingredients */
+        if(!Request["inside"].IsEmpty()){
+            foreach (var selection in Request["inside"].Split(',')){currentItem.IngredientsInside.Add(new Ingredient(selection.AsInt()));}
+        }
+
+        /* Get cost of the roll */
+        currentItem.Price = currentItem.calculatePrice();
+        /* Add roll to the database */
+        currentItem.addRoll();
+
+        /* Add roll to customer object */
+        currentCustomer.Rolls.Add(currentItem);
+
+        /* Set cart item information */
+        //cartItem = new CartItem();
+        cartItem.fkCartId = currentCustomer.UserCart.pkCartId;
+        cartItem.CICustomerRoll = currentItem;
+        cartItem.Price = (decimal)currentItem.Price;
+        cartItem.Qty = Request["rollQty"].AsInt();
+        cartItem.Instructions = Request["instructions"];
+        
+        /* Add options */
+        if(!Request["rollOptions"].IsEmpty()){
+            foreach (var selection in Request["rollOptions"].Split(',')){
+                OrderOption o = new OrderOption(selection.AsInt());
+                cartItem.Options.Add(new OrderOption(selection.AsInt()));
+                cartItem.Price += o.OptionPrice;
+            }
+        } /* No options were chosen */
+
+        /* Add cart item to the database */
+        cartItem.addCartItem();
+
+        /* Add cart items to the user(object)'s cart */
+        currentCustomer.UserCart.CartItems.Add(cartItem);
+
+        /* Send the customer to their cart */
+        Response.Redirect("~/reviewCart");
+    }
+    
+
+}
+
+<script type="text/javascript">
+    $(document).ready(function () {
+        var rollType = $("input[name$='rollType']:checked");
+        var optionsSection = $("li.options");
+        var topIngredientsSection = $("#onTopIngredients");
+        var insideIngredientsSection = $("#insideIngredients");
+        var rollDetailsSection = $("#CARrollDetails");
+        var rollNameP = $("p#nameYourRoll");
+
+        /* Reset and hide certain sections */
+        topIngredientsSection.hide();
+        insideIngredientsSection.hide();
+        optionsSection.hide();
+        rollDetailsSection.hide();
+        rollNameP.hide();
+        $("#saveRoll").removeAttr('checked');
+        $("#rollName").val("");
+
+        /* If a roll type is chosen, show roll details (instructions, name, etc.) */
+        if (rollType.val() != null) { showRollDetails(); }
+        /* If roll type is hosomaki(1) or futomaki(3) show only inside ingredients */
+        if (rollType.val() == "1" || rollType.val() == "3") {
+            showInsideSection();
+            /* If roll type is uramaki(2), show all ingredient sections */
+        } else if (rollType.val() == "2") { showAllSections(); }
+
+        /* Show/Hide functionality */
+        function showRollDetails() { rollDetailsSection.show(); }
+        function showInsideSection() { topIngredientsSection.hide(); insideIngredientsSection.show(); optionsSection.show(); }
+        function showAllSections() { topIngredientsSection.show(); insideIngredientsSection.show(); rollDetailsSection.show(); optionsSection.show(); }
+        function hideAllSections() { topIngredientsSection.hide(); insideIngredientsSection.hide(); rollDetailsSection.hide(); optionsSection.hide(); }
+
+
+
+        var topIngredients = [];
+        var insideIngredients = [];
+        var options = [];
+
+        var maxInsideIngredients = 1;
+        var insideIngredientCount = 0;
+        var insideToppingCount = 0;
+
+        var maxTopIngredients = 0;
+        var topIngredientCount = 0;
+        var topToppingCount = 0;
+
+        var qty = 1;
+
+        $("input[name$='rollType']").click(function () {
+            /* Reset roll on roll type change */
+            resetRoll(false);
+
+            insideIngredientsSection.show();
+            rollDetailsSection.show();
+            optionsSection.show();
+
+            maxInsideIngredients = $(this).parent("p").find(".maxIngredientsInside").val();
+
+            if (maxInsideIngredients == 1) {
+                $("input.group").each(function () {
+                    if ($(this).val() == "Large Ingredients" || $(this).val() == "Mixed" || $(this).val() == "Other") {
+                        $(this).parent("span").hide()
+                        $(this).parent("span").parent("p").parent("fieldset").hide();
+                    }
+                });
+            } else {
+                $("input.group").each(function () {
+                    if ($(this).val() == "Large Ingredients" || $(this).val() == "Mixed" || $(this).val() == "Other") {
+                        $(this).parent("span").css("display", "inline-block");
+                        $(this).parent("span").parent("p").parent("fieldset").css("display", "inline-block");
+                    }
+                });
+            }
+
+            if ($(this).parent("p").find(".ingredientsOutside").val() == "True") {
+                topIngredientsSection.show();
+                maxTopIngredients = $(this).parent("p").find(".maxIngredientsOutside").val();
+            } else { topIngredientsSection.hide(); }
+        }); /* #END rollType.click */
+
+
+        /* Adding an ingredient over the top of the roll */
+        $(".topIngredient").change(function () {
+            var ingredientId = $(this).parent("span").find("input[name$='onTop']").val();
+            var ingredientName = $(this).parent("span").find("label").text();
+            var ingredientGroup = $(this).parent("span").find("input.group").val();
+            var ingredientPrice = parseFloat($(this).parent("span").find("input.ingredient-price").val());
+            qty = $("#rollQty").val();
+
+            /* Find out the size of the newly added ingredient */
+            var newIngredientCount = ingredientGroup != "Toppings" ? ingredientGroup == "Large Ingredients" ? 2 : 1 : 0;
+            if (ingredientGroup == "Exclusive") { } /* Radio buttons for Sesame Seeds or Masago */
+
+            /* User has checked more ingredients than allowed */
+            if ((topIngredientCount + newIngredientCount) > maxTopIngredients && $(this).is(':checked')) {
+                var plural = maxTopIngredients > 1 ? plural = "s" : "";
+                alert("You can only put " + maxTopIngredients + " ingredient" + plural + " on top of your roll.");
+
+                /* Uncheck ingredient */
+                $(this).removeAttr('checked');
+            } else {
+                /* User has checked an ingredient */
+                if ($(this).is(':checked')) {
+                    if (ingredientGroup == "Toppings") { topToppingCount++; }
+                    else { topIngredientCount += newIngredientCount; } /* Add the new item's size to the ingredient count */
+
+                    /* Add ingredient to the array */
+                    topIngredients.push({ Id: ingredientId, Name: ingredientName, Group: ingredientGroup, Price: ingredientPrice });
+                }
+                /* User has unchecked an ingredient */
+                else if (!$(this).is(':checked')) {
+                    if (ingredientGroup == "Toppings") { topToppingCount--; }
+                    else { topIngredientCount -= newIngredientCount; } /* Remove unchecked item's size from the ingredient count */
+
+                    /* Remove ingredient from the array */
+                    removeArrayItem(topIngredients, ingredientId);
+
+                }
+
+                /* Calculate and show user the updated price */
+                $("#rollPrice").val(calculateCost(topIngredients, insideIngredients, options, qty));
+            }
+        }); /* #END .topIngredient.change */
+
+
+        /* Adding an ingredient inside the roll */
+        $(".insideIngredient").change(function () {
+            var ingredientId = $(this).parent("span").find("input[name$='inside']").val();
+            var ingredientName = $(this).parent("span").find("label").text();
+            var ingredientGroup = $(this).parent("span").find("input.group").val();
+            var ingredientPrice = parseFloat($(this).parent("span").find("input.ingredient-price").val());
+            qty = $("#rollQty").val();
+
+
+            /* Find out the size of the newly added ingredient */
+            var newIngredientCount = ingredientGroup != "Toppings" ? ingredientGroup == "Large Ingredients" ? 2 : 1 : 0;
+
+            /* User has checked more ingredients than allowed */
+            if ((insideIngredientCount + newIngredientCount) > maxInsideIngredients && $(this).is(':checked')) {
+                var plural = maxInsideIngredients > 1 ? plural = "s" : "";
+                alert("You may only put " + maxInsideIngredients + " ingredient" + plural + " inside this kind of roll. (Large ingredients count as 2)");
+
+                /* Uncheck ingredient */
+                $(this).removeAttr('checked');
+
+            } else {
+                /* User has checked an ingredient */
+                if ($(this).is(':checked')) {
+                    if (ingredientGroup == "Toppings") { insideToppingCount++; }
+                    else { insideIngredientCount += newIngredientCount; } /* Add the new item's size to the ingredient count */
+
+                    /* Add ingredient to the array */
+                    insideIngredients.push({ Id: ingredientId, Name: ingredientName, Group: ingredientGroup, Price: ingredientPrice });
+                }
+                /* User has unchecked an ingredient */
+                else if (!$(this).is(':checked') && $(this).is(':checkbox')) {
+                    if (ingredientGroup == "Toppings") { insideToppingCount--; }
+                    else { insideIngredientCount -= newIngredientCount; } /* Remove unchecked item's size from the ingredient count */
+
+                    /* Remove ingredient from the array */
+                    removeArrayItem(insideIngredients, ingredientId);
+                }
+
+                /* Calculate and show user the updated price */
+                $("#rollPrice").val(calculateCost(topIngredients, insideIngredients, options, qty));
+
+            }
+        }); /* #END .insideIngredient.change */
+
+
+        $(".roll-option").change(function () {
+            var optionId = $(this).parent("span").find(".option-id").val();
+            var optionName = $(this).parent("span").find(".option-name").val();
+            var optionPrice = parseFloat($(this).parent("span").find(".option-price").val());
+
+            /* User has checked an ingredient */
+            if ($(this).is(':checked')) {
+                /* Add option to the array */
+                options.push({ Id: optionId, Name: optionName, Price: optionPrice });
+            }
+            /* User has unchecked an ingredient */
+            else if (!$(this).is(':checked')) {
+                /* Remove ingredient from the array */
+                removeArrayItem(options, optionId);
+            }
+
+            /* Get cost of extra options */
+            var optionCost = 0;
+            for (i = 0; i < options.length; i++) {
+                optionCost += options[i].Price;
+            }
+
+            var optionString = "$" + (optionCost * qty);
+            if (qty > 1) { optionString += " ($" + optionCost.toFixed(2) + "/ea)"; }
+            $(".options-total").html(optionString);
+
+            $("#rollPrice").val(calculateCost(topIngredients, insideIngredients, options, qty));
+        });
+
+        /* Update price on keyup change in qty */
+        $("#rollQty").keyup(function () {
+            qty = $("#rollQty").val();
+
+            $("#rollPrice").val(calculateCost(topIngredients, insideIngredients, options, qty));
+        });
+
+
+        /* Reset entire form */
+        $("#resetRoll").click(function () {
+            resetRoll(true);
+            $("input:radio").each(function () { $(this).removeAttr('checked'); });
+        });
+
+        /* Reset all but roll type selection */
+        function resetRoll(button) {
+            while (insideIngredients.length) { insideIngredients.pop(); }
+            while (topIngredients.length) { topIngredients.pop(); }
+            maxTopIngredients = 0; topIngredientCount = 0; topToppingCount = 0;
+            maxInsideIngredients = 1; insideIngredientCount = 0; insideToppingCount = 0;
+            $("input.topIngredient:checkbox").each(function () { $(this).removeAttr('checked'); });
+            $("input.insideIngredient:checkbox").each(function () { $(this).removeAttr('checked'); });
+            $("#rollPrice").val("");
+
+            if (button) {
+                $("#rollName").val(""); $("#instructions").val(""); $("#rollQty").val("1");
+                hideAllSections(); rollNameP.hide();
+            }
+        }
+
+
+        $("#saveRoll").click(function () {
+            if ($(this).is(':checked')) { rollNameP.show(); }
+            else { rollNameP.hide(); }
+        });
+
+    });
+</script>
+
+
+<section id="createARoll">
+    <header>
+        <h3>@Page.Title</h3>
+    </header>
+
+    <div>
+        <form method="post">
+            <ul>
+                @{/*
+                    <!-- li>
+                        <label for="preMadeRolls" class="bold">Pre-Made Rolls :</label>
+                        <select id="preMadeRolls" disabled>
+                            <option selected></option>
+                            (at){foreach(productItem p in _common.getProducts()){
+                                    <option id="(at)p.Name" value="(at)p.Name">(at)p.Name
+                                            (at){if(p.JPName != null){
+                                                <text>((at)p.JPName)</text>;
+                                            }
+                                        }
+                                    </option>
+                                }
+                            }
+                        </select>
+                        <small>(optional)</small>
+                    </li -->
+                */
+                }
+
+                <li id="rollTypes">
+                    <p class="bold">Choose what type of roll you want: </p>
+                    <p class="error">@Html.ValidationMessage("rollType")</p>
+
+                    @{foreach(RollType t in _common.getRollTypes()){
+                            <p>
+                                <input type="radio" name="rollType" id="@t.pkRollTypeId" value="@t.pkRollTypeId" /><strong>@t.RollTypeName</strong>
+                                <small>@t.RollTypeDescription</small>
+                                <input type="hidden" class="maxIngredientsInside" value="@t.IngredientsAllowed" />
+                                <input type="hidden" class="maxIngredientsOutside" value="@t.SecondaryIngredientsAllowed" />
+                                <input type="hidden" class="ingredientsOutside" value="@t.hasSecondaryIngredients.ToString()" />
+                            </p>
+                        }
+                    }
+                </li>
+
+                    
+                <li id="onTopIngredients" class="CARingredients">
+                    <p class="bold">
+                        What ingredients would you like over the top of the roll:
+                    </p>
+
+                    @{foreach(IngredientGroup ig in _common.getIngredientGroups()){
+                        List<Ingredient> ingredientsInGroup = _common.getTopIngredientsInGroup(ig.pkGroupId);
+                        if(ingredientsInGroup.Count() < 1){continue;}
+                        <fieldset>
+                            <legend>@ig.GroupName</legend>
+                            <p>
+                                @foreach(Ingredient i in ingredientsInGroup){
+                                    <span>
+                                        <input type="checkbox" name="onTop" id="top-@i.pkIngredientId" class="topIngredient" value="@i.pkIngredientId"
+                                                title="@i.IngredientAltName - @i.Description" @Validation.For("onTop") />
+                                        <label for="top-@i.pkIngredientId">@i.IngredientName</label>
+                                        <input type="hidden" id='top-@i.pkIngredientId-Price' class="ingredient-price" value="@i.IngredientPricePerRoll" />
+                                        <input type="hidden" id="top-@i.pkIngredientId-Group" class="group" value="@i.IGroup.GroupName" />
+                                    </span>
+                                }
+                            </p>
+                        </fieldset>
+                    }}
+                </li>  
+
+                <li id="insideIngredients" class="CARingredients">
+                    <p class="bold">What ingredients would you like inside the roll: </p>
+                    <p class="error">@Html.ValidationMessage("inside")</p>
+
+                        
+                    @{foreach(IngredientGroup ig in _common.getIngredientGroups()){
+                        List<Ingredient> ingredientsInGroup = _common.getInsideIngredientsInGroup(ig.pkGroupId);
+                        if(ingredientsInGroup.Count() < 1){continue;}
+
+                        <fieldset>
+                            <legend>@ig.GroupName</legend>
+                            <p>
+                            @foreach(Ingredient i in ingredientsInGroup){
+                                <span>
+                                    <input type="checkbox" name="inside" id="in-@i.pkIngredientId" class="insideIngredient" value="@i.pkIngredientId"
+                                            title="@i.IngredientAltName - @i.Description" @Validation.For("inside") />
+                                    <label for="in-@i.pkIngredientId">@i.IngredientName</label>
+                                    <input type="hidden" id='in-@i.pkIngredientId-Price' class="ingredient-price" value="@i.IngredientPricePerRoll" />
+                                    <input type="hidden" id="in-@i.pkIngredientId-Group" class="group" value="@i.IGroup.GroupName" />
+                                </span>
+                            }
+                            </p>
+                        </fieldset>
+                    }}
+                </li>
+
+                <li class="options">
+                    <fieldset>
+                        <legend>Options (<span class="options-total">$0</span>)</legend>
+                        @Helpers.OptionCheckboxes()
+                    </fieldset>
+                </li>
+            </ul>
+            <ul id="CARrollDetails">
+                <li id="NameCustomRoll">
+                    <p>
+                        <input type="checkbox" id="saveRoll" name="saveRoll" />
+                        <label for="saveRoll">Save Roll for Future Orders?</label>
+                    </p>
+
+                    <p id="nameYourRoll">
+                        <label for="rollName">Name your roll:</label>
+                        <input type="text" id="rollName" name="rollName" @Validation.For("rollName") /> <small>(optional)</small>
+                    </p>
+                </li>
+
+                <li id="specialInstructrions">
+                    <p>
+                        <label for="instructions">Special Instructions: </label>
+                        <input type="text" id="instructions" name="instructions" />
+                    </p>
+                </li>
+
+                <li id="qty">
+                    <label for="rollQty">Qty:</label>
+                    <input type="text" id="rollQty" name="rollQty" value="1" @Validation.For("rollQty") />
+                    <div>@Html.ValidationMessage("pPrice")</div>
+                </li>
+
+                <li id="price">
+                    <label for="rollPrice">Price:</label>
+                    $<input type="text" id="rollPrice" name="rollPrice" class="price" readonly="true" />
+                </li>
+
+                <li id="buttons">
+                    <p>
+                        @{
+                            if(!currentCustomer.hasId()){
+                                <input type="submit" id="rollSubmit" value="Add To Cart" disabled />
+                                <br />
+                                @Helpers.noUser("create your own roll")
+                            } else{<input type="submit" id="rollSubmit" value="Add To Cart" />}
+                        }
+                        <input type="button" id="resetRoll" value="Reset Roll" />
+                    </p>
+                </li>
+            </ul>
+        </form>
+    </div>
+    
+</section>

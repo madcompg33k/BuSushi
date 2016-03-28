@@ -1,0 +1,42 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Manage Order Options";
+
+    var options = _common.getAllOrderOptions();
+
+    var gridOrderOptions = new WebGrid(source: options,
+                                defaultSort: "Name",
+                                rowsPerPage: 10);
+}
+
+<section id="manageOptions">
+    <header>
+        <h3><a href="~/admin" class="arrow">&larr;</a>@Page.Title <small><a href="~/admin/modifyOrderOption/">Add New</a></small></h3>
+    </header>
+
+    @gridOrderOptions.GetHtml(
+        tableStyle: "webGrid",
+        headerStyle: "head",
+        alternatingRowStyle: "alt",
+        columns: gridOrderOptions.Columns(
+            gridOrderOptions.Column("OptionName", "Name"),
+            gridOrderOptions.Column("OptionDescription", "Description"),
+            gridOrderOptions.Column("OptionPrice", "Price",
+                format: @<span>@String.Format("{0:C}", item.OptionPrice)</span>
+            ),
+            gridOrderOptions.Column("Active", "Active",
+                format: @<text>
+                            <span class="status">@item.Active</span>
+                        </text>
+            ),
+            gridOrderOptions.Column(
+                style: "options",
+                format:
+                    @<text>
+                        <a href="~/admin/modifyOrderOption/@item.pkOptionId">Edit</a>
+                    </text>)
+        )
+    )
+
+
+</section>

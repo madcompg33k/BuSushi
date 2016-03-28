@@ -1,0 +1,188 @@
+﻿@{
+    var commandText = string.Empty;
+    var cartId = 0;
+    var totalItems = 0;
+    
+    Customer currentCustomer = _common.getCustomer();
+
+    foreach(CartItem item in currentCustomer.UserCart.CartItems){
+        totalItems += item.Qty;
+    }
+}
+
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta title="Bu Sushi - Sushi Delivery & Catering Service" />
+        <meta name="description" content="Bu Sushi delivers sushi to local businesses in the Benson and Sierra Vista, AZ area. We also offer other non-sushi items for anyone who isn't a fan of sushi." />
+        <meta name="keywords" content="sushi, delivery, catering, southern arizona, benson, sierra vista" />
+        <title>Bu Sushi (@Page.Title)</title>
+        <link href="~/content/themes/base/jquery.ui.all.css" rel="stylesheet" type="text/css" />
+        <link href="~/content/default.css" rel="stylesheet" type="text/css" />
+        @if (Roles.IsUserInRole("Administrator") || Roles.IsUserInRole("Master")){
+            <link href="~/admin/_admin.css" rel="stylesheet" type="text/css" />
+        }
+        <link href="~/favicon.ico" rel="shortcut icon" type="image/x-icon" />
+        <script src="~/scripts/common.js"></script>
+        <script src="~/scripts/ajax.js"></script>
+        <script src="~/scripts/jquery-1.9.1.min.js"></script>
+        <script src="~/scripts/jquery-ui.js"></script>
+        <script src="~/scripts/jquery-ui.min.js"></script>
+        <script src="~/scripts/modernizr-2.6.2.js"></script>
+        <meta name="viewport" content="width=device-width" />
+
+        <script>
+            $(function () {
+                var $collapsibleMenu = $(".collapsibleMenuItem");
+                var $collapsibleMenuItem = $(".collapsibleMenuItem nav ul li a");
+
+                var $rightPulloutMenu = $(".right-pullout-menu");
+                var $rightPulloutMenuItem = $(".right-pullout-menu nav ul li a");
+
+                $(".collapsibleMenuItem, .collapsibleMenuItem>nav:first-of-type").hover(function () {
+                    $(this).find("nav:first-of-type").slideToggle(100);
+                    $(this).find(".up-arrow, .down-arrow").toggle();
+                });
+            });
+            /*
+            $(function () {
+                $("input[type=text]").focus(function () {
+                    $(this).select();
+                });
+            });
+            */
+            (function (i, s, o, g, r, a, m) {
+                i['GoogleAnalyticsObject'] = r; i[r] = i[r] || function () {
+                    (i[r].q = i[r].q || []).push(arguments)
+                }, i[r].l = 1 * new Date(); a = s.createElement(o),
+            m = s.getElementsByTagName(o)[0]; a.async = 1; a.src = g; m.parentNode.insertBefore(a, m)
+            })(window, document, 'script', '//www.google-analytics.com/analytics.js', 'ga');
+
+            ga('create', 'UA-55135734-1', 'auto');
+            ga('send', 'pageview');
+        </script>
+    </head>
+    <body>
+        <div id="fb-root"></div>
+        <script>(function(d, s, id) {
+          var js, fjs = d.getElementsByTagName(s)[0];
+          if (d.getElementById(id)) return;
+          js = d.createElement(s); js.id = id;
+          js.src = "//connect.facebook.net/en_US/sdk.js#xfbml=1&appId=234319856754306&version=v2.0";
+          fjs.parentNode.insertBefore(js, fjs);
+        }(document, 'script', 'facebook-jssdk'));</script>
+        <div id="mainDiv">
+            <header>
+                <div class="content-wrapper">
+                    <div id="menu">
+                         <nav class="float-left">
+                            <ul>
+                                <li><a href="~/">Home</a></li>
+                                <li class="collapsibleMenuItem">
+                                    <header><a href="~/products/">Products <span class="down-arrow">&#9660;</span><span class="up-arrow">&#9650;</span></a></header>
+                                    
+                                    <nav>
+                                        <ul id="productsMenu" class="sub-menu">
+                                            <li><a href="~/products/" class="dropMenUItem">All Products</a></li>
+                                            <li><a href="~/createaroll/" class="dropMenuItem">Create-A-Roll</a></li>
+                                            <li><a href="~/catering" class="dropMenuItem">Catering</a></li>
+                                        </ul>
+                                    </nav>
+                                </li>
+                                
+                                <li class="collapsibleMenuItem">
+                                    <header><a href="~/about">About Us <span class="down-arrow">&#9660;</span><span class="up-arrow">&#9650;</span></a></header>
+
+                                    <nav>
+                                        <ul id="aboutUsMenu" class="sub-menu">
+                                            <li><a href="~/about">Who Are We?</a></li>
+                                            <li><a href="~/staff">Our Staff</a></li>
+                                            <li><a href="~/sushidelivery/" class="dropMenuItem">Sushi Delivery</a></li>
+                                            <li><a href="~/lunchdeliveryservice/" class="dropMenuItem">Lunch Delivery Service</a></li>
+                                            <li><a href="~/sushi101">Sushi 101</a></li>
+                                            <li><a href="~/contact">Contact</a></li>
+                                        </ul>
+                                    </nav>
+                                    
+                                </li>
+                                <li class="social-media">
+                                    <a href="http://www.facebook.com/busushi2014" target="_blank"><img src="/images/social_media/facebook.png" alt="like us on facebook" class="social-media-icon" /></a>
+                                    <a href="http://www.twitter.com/busushiaz" target="_blank"><img src="/images/social_media/twitter.png" alt="follow us on twitter" class="social-media-icon" /></a>
+                                    <a href="http://www.instagram.com/busushiaz" target="_blank"><img src="/images/social_media/instagram.png" alt="follow us on instagram" class="social-media-icon" /></a>
+                                </li>
+                            </ul>
+                        </nav>
+                        <nav id="login" class="float-right">
+                            @if (WebSecurity.IsAuthenticated) {
+                                <text>
+                                    <ul>
+                                        @if(totalItems > 0){
+                                            <li class="cart-qty">
+                                                <a href="/reviewCart">Cart (@totalItems)</a>
+                                            </li>
+                                        }
+                                        <li class="collapsibleMenuItem">
+                                            @if (Roles.IsUserInRole("Administrator") || Roles.IsUserInRole("Master")){
+                                            <header><a href="~/Account/Manage" title="Manage">My Account <span class="down-arrow">&#9660;</span><span class="up-arrow">&#9650;</span></a></header>
+                                            <nav>
+                                                <ul id="adminMenu" class="sub-menu">
+                                                    <li><a href="~/admin/" class="dropMenuItem">Admin Main</a></li>
+                                                    <li>~Manage~</li>
+                                                    <li><a href="~/admin/manageOrders" class="dropMenuItem">Orders</a></li>
+                                                    <li><a href="~/admin/manageSchedule/" class="dropMenuItem">Schedule</a></li>
+                                                    <li><a href="~/admin/manageProducts/" class="dropMenuItem">Products</a></li>
+                                                    <li><a href="~/admin/manageDiscounts/" class="dropMenuItem">Discounts</a></li>
+                                                    <li><a href="~/admin/manageIngredients/" class="dropMenuItem">Ingredients</a></li>
+                                                    <li><a href="~/admin/manageCookingStyles/" class="dropMenuItem">Cooking Styles</a></li>
+                                                    <li><a href="~/admin/manageTags/" class="dropMenuItem">Tags</a></li>
+                                                    <li><a href="~/admin/manageCustomers" class="dropMenuItem">Users</a></li>
+                                                </ul>
+                                            </nav>
+                                            } else{
+                                                <header><a href="~/Account/Manage" title="Manage">My Account</a></header>
+                                            }
+                                        </li>
+                                        <li>
+                                            <form id="logoutForm" action="~/Account/Logout" method="post">
+                                                @AntiForgery.GetHtml()
+                                                <a href="javascript:document.getElementById('logoutForm').submit()">Log out</a>
+                                            </form>
+                                        </li>
+                                    </ul>
+                                    
+                                </text>
+                            } else {
+                                <ul id="loginRegister">
+                                    @*<!-- li><a href="~/account/register/">Register</a></li -->*@
+                                    <li><a href="~/account/login/">Log in</a></li>
+                                    @*<li><a href="~/account/login/">Log in (local)</a></li>*@
+                                </ul>
+                            }
+                        </nav>
+                    </div><!-- END div#menu -->
+                    <div class="header-image-div">
+                        <p class="site-title"><a href="~/"><img id="headerGraphic" src="~/images/header.png" alt="Bu Sushi" /></a></p>
+                    </div>
+                </div><!-- END div.content-wrapper -->
+            </header>
+            <div id="body">
+                @RenderSection("featured", required: false)
+                <section class="content-wrapper main-content clear-fix">
+                    @RenderBody()
+                </section>
+            </div><!-- END div#body -->
+        </div><!-- END div#mainDiv -->
+        <footer>
+            <div class="content-wrapper">
+                <div class="float-left">
+                    <span>&copy; @DateTime.Now.Year - Bu Sushi, LLC</span>
+                    <span>(520) 302-4228</span>
+                    <span><a href="~/privacy/">Privacy Policy</a></span>
+                    <span>Website created by Melanie Yaun</span>
+                </div>
+            </div>
+        </footer>
+        @RenderSection("Scripts", required: false)
+    </body>
+</html>

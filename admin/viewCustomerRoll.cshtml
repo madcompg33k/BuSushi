@@ -1,0 +1,153 @@
+﻿
+@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "View Customer Roll";
+
+    var id = UrlData[0].AsInt();
+    var hasId = !string.IsNullOrEmpty(UrlData[0]);
+    var error = "";
+
+    CustomerRoll currentItem = new CustomerRoll();
+    
+    if(hasId){
+        currentItem = new CustomerRoll(id);
+    }
+    
+    if (IsPost && Validation.IsValid()) {
+        var action = Request.Form["action"];
+        try{
+            /* Do something */
+            if(string.Equals(action, "Remove Special")){
+                currentItem.removeSpecial();
+                currentItem = new CustomerRoll(id);
+            }else if(string.Equals(action, "Add Special")){
+                /* Get special date information */
+                if(Request["beginDate"] != null){
+                    currentItem.SpecialBeginDate = Request["beginDate"].AsDateTime();
+                    currentItem.SpecialEndDate = Request["endDate"].AsDateTime();
+                    if(currentItem.SpecialBeginDate != null){
+                        currentItem.setSpecial();
+                    }else{
+                        error = "You must set a date to set an item as a special.";
+                    }
+                }
+            }
+            else if(string.Equals(action, "Deactivate")){currentItem.Deactivate();}
+            else if(string.Equals(action, "Activate")){currentItem.Activate();}
+        }catch(Exception e){error = e.Message;}
+    }
+}
+
+
+<script type="text/javascript">
+    $(function () {
+        $("#beginDate").datepicker({ minDate: 0 }).datepicker(function () {
+            $("#beginDate").datepicker("option", "dateFormat", 'mm/dd/yy');
+        });
+        $("#endDate").datepicker({ minDate: 1, changeYear: true }).datepicker(function () {
+            $("#endDate").datepicker("option", "dateFormat", 'mm/dd/yy');
+        });
+    });
+
+</script>
+
+<section id="modifyProductRoll">
+    <header>
+        <h3><a href="~/admin" class="arrow">&larr;</a>
+            <span>@Page.Title</span>
+            @if(currentItem.isActive){<span>(Active)</span>}else{<span>(Inactive)</span>}
+            (ID: @currentItem.pkCustomerRollId)
+        </h3>
+    </header>
+
+    <form id="frmModify" method="post">
+        <ul>
+            <li>
+                <span>Name:</span>
+                <span>
+                    @if(!string.IsNullOrEmpty(currentItem.RollName)){
+                        <text>@currentItem.RollName</text>;
+                    } else{
+                        <text>(Custom Roll)</text>
+                    }
+                </span>
+            </li>
+
+            <li class="rollItem">
+                @Helpers.rollTypes(currentItem.RType.pkRollTypeId)
+            </li>
+
+            <li>
+                <fieldset>
+                    <legend>Special</legend>
+                    <label for="beginDate">Special Begin Date:</label>
+                    <input type="text" id="beginDate" name="beginDate" value="@currentItem.SpecialBeginDate" @Validation.For("beginDate") />
+                    <br />
+                    <label for="endDate">Special End Date:</label>
+                    <input type="text" id="endDate" name="endDate" value="@currentItem.SpecialEndDate" @Validation.For("beginDate") />
+                    <div>@Html.ValidationMessage("beginDate")</div>
+                    <div>@Html.ValidationMessage("endDate")</div>
+                    @if(currentItem.SpecialBeginDate != null){
+                        <input type="submit" name="action" value="Remove Special" />
+                    }else{
+                        <input type="submit" name="action" value="Add Special" />
+                    }
+                </fieldset>
+            </li>
+        </ul>
+
+        <ul>     
+            <li id="onTopIngredients" class="ingredients">
+                <p class="title">Ingredients (Top)</p>
+                
+                @if(currentItem.IngredientsTop.Count > 0){
+                    foreach(var ing in currentItem.IngredientsTop){
+                        <p class="detail">@ing.IngredientName (@String.Format("{0:C}", ing.IngredientPricePerRoll))</p>
+                    }
+                } else{<p class="detail">(none)</p>}
+            </li>  
+
+            <li id="insideIngredients" class="ingredients">
+                <p class="title">Ingredients (Inside)</p>
+                
+                @if(currentItem.IngredientsInside.Count > 0){
+                    foreach(var ing in currentItem.IngredientsInside){
+                        <p class="detail">@ing.IngredientName (@String.Format("{0:C}", ing.IngredientPricePerRoll))</p>
+                    }
+                } else{<p class="detail">(none)</p>}
+            </li>
+
+            @*
+            <li id="cookingStyles" class="cookingStyles">
+                <p class="title">Cooking Styles: </p>
+
+                @if(product.Style.Count > 0){
+                    foreach(CookingStyle cs in product.Style){<p class="detail">cs.Name</p>}
+                }else{<p class="detail">(none)</p>}    
+            </li>
+            *@
+
+            <li id="tags" class="tags">
+                <p class="title">Tags</p>
+
+                @if(currentItem.Tags.Count > 0){
+                    foreach(Tag t in currentItem.Tags){<p class="detail">@t.TagName</p>}
+                } else{<p class="detail">(none)</p>}
+            </li>
+        </ul>
+
+        <ul>
+            <li>
+                <span>Price:</span>
+                <span>@String.Format("{0:C}", currentItem.Price)</span>
+            </li> 
+
+            <li class="actions">
+                @if(currentItem.isActive){<input type="submit" name="action" value="Deactivate" />}
+                else{<input type="submit" name="action" value="Activate" />}
+                <button formaction="~/admin">Back</button>
+                @if(Roles.IsUserInRole("Master") && hasId){<button formaction="~/admin/deleteCustomerRollConfirm/@id" class="deleteButton">Delete</button>}
+            </li>
+        </ul>
+    </form>
+</section>

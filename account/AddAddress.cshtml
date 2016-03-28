@@ -1,0 +1,131 @@
+﻿@{
+    Layout = "~/_SiteLayout.cshtml";
+    Page.Title = "Add New Address";
+
+    if(!WebSecurity.IsCurrentUser(WebSecurity.CurrentUserName)){Response.Redirect("~/");}
+
+    Customer currentCustomer = _common.getCustomer();
+    
+    if (IsPost){
+        AntiForgery.Validate();
+        CustomerAddress address = new CustomerAddress();
+        address.fkCustomerId = currentCustomer.pkCustomerId;
+        address.Nickname = Request.Form["nickname"];
+        address.Address1 = Request.Form["address1"];
+        address.Address2 = Request.Form["address2"];
+        address.SpInstructions = Request.Form["instructions"];
+
+        if(!string.IsNullOrEmpty(Request["cityId"])){address.AddrCity = new City(Request["cityId"].AsInt());}
+        else{
+            City city = new City();
+            city.CityName = Request["city"];
+            city.ZipCode = Request["zip"];
+            city.CState = new State(Request["state"].AsInt());
+            
+            address.AddrCity = city;
+            
+            city.addCity();
+        }
+
+        address.isBilling = Request.Form["isBilling"] == "on" ? true : false;
+        address.isPrimary = Request.Form["isPrimary"] == "on" ? true : false;
+
+        address.addCustomerAddress();
+
+        Response.Redirect("~/account/Manage");
+
+    }
+
+}
+
+<script type="text/javascript">
+    $(function () {
+        var cities = [];
+        /* Get full list of cities/zip/state */
+        @foreach(City c in _common.getCities()){
+            <text>cities.push({ Id: '@c.pkCityId', Name: '@c.CityName', Zip: '@c.ZipCode', StateId: '@c.CState.pkStateId' }); </text>
+        }
+
+        $("#zip").keyup(function () {getCityInfo();});
+        $("#zip").click(function(){getCityInfo();});
+        $("#zip").select(function(){getCityInfo();});
+        $("#zip").change(function(){getCityInfo();});
+
+        function getCityInfo(){
+            if ($("#zip").val().replace(/ /g, '').length == 5) {
+                var city = lookup(cities, "Zip", $("#zip").val().substring(0,5));
+
+                if (city.length != 0) {
+                    $("#cityId").val(city.Id);
+                    $("#city").val(city.Name);
+                    $("#state").val(city.StateId);
+                }
+            } else if ($("#zip").val().replace(/ /g, '').length < 5) {
+                $("#cityId").val("");
+                $("#city").val("");
+                $("#state").val(0);
+            }
+        }
+    });
+</script>
+
+<section id="addAddress">
+    <header>
+        <h3>@Page.Title</h3>
+    </header>
+
+    <form method="post">
+        @AntiForgery.GetHtml()
+        <ul>
+            <li class="nickname">
+                <header>
+                    Give this address a meaningful nickname (e.g. Office, Billing, etc.).
+                </header>
+                <p class="address-nickname">
+                    <label for="nickname">Nickname: </label>
+                    <input type="text" id="nickname" name="nickname" value="" />
+                </p>
+            </li>
+
+            <li id="address1" class="address">
+                <label for="address1">Address: </label>
+                <input type="text" id="address1" name="address1" value="" />
+            </li>
+
+            <li id="address2" class="address">
+                <label for="address2">Address 2: </label>
+                <input type="text" id="address2" name="address2" value="" />
+            </li>
+
+            <li id="cityInfo" class="address">
+                <label for="zip">Zip Code: </label>
+                <input type="text" id="zip" name="zip" value="" />
+            
+                <label for="city">City: </label>
+                <input type="text" id="city" name="city" value="" />
+                <input type="hidden" id="cityId" name="cityId" value="" />
+                
+                @Helpers.states(0)
+            </li>
+
+            <li>
+                <label for="instructions">Instructions:</label>
+                <br />
+                <textarea id="instructions" name="instructions"></textarea>
+            </li>
+
+            <li id="primary" class="address">
+                <label for="isPrimary">Primary Address?</label>
+                <input type="checkbox" id="isPrimary" name="isPrimary" />
+
+                <label for="isBilling">Billing Address?</label>
+                <input type="checkbox" id="isBilling" name="isBilling" />
+            </li>
+
+            <li>
+                <input type="submit" value="Add Address" />
+                <button id="cancel" formaction="~/account/manage">Cancel</button>
+            </li>
+        </ul>
+    </form>
+</section>

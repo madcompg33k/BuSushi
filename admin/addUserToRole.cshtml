@@ -1,0 +1,19 @@
+﻿@{
+    if (!Roles.IsUserInRole("Master")){
+        Response.Redirect("~/");
+    }
+
+    var CustomerId = UrlData[0].AsInt();
+    var RoleName = UrlData[1];
+    var hasCId = !string.IsNullOrEmpty(UrlData[0]);
+    var hasRoleName = !string.IsNullOrEmpty(UrlData[1]);
+
+    Customer customer = new Customer();
+    
+    if(hasCId && hasRoleName){
+        customer = new Customer(CustomerId);
+    } else{Response.Redirect("~/admin/manageCustomers/");}
+
+    Roles.AddUserToRole(customer.Username, RoleName);
+    Response.Redirect("~/admin/viewCustomer/" + customer.UserId);
+}

@@ -1,0 +1,86 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Modify Order Option";
+
+    var Id = UrlData[0].AsInt();
+    var hasId = !string.IsNullOrEmpty(UrlData[0]);
+
+    OrderOption option = null;
+    
+    if(hasId){
+        option = new OrderOption(Id);
+    } else{option = new OrderOption();}
+
+    // Setup validation
+    Validation.RequireField("oName", "You must specify a name.");
+    Validation.RequireField("oPrice", "You must specify a price.");
+
+    if (IsPost && Validation.IsValid()) {
+        option.OptionName = Request["oName"];
+        option.OptionDescription = Request["oDesc"];
+        option.OptionCost = Request["oCost"].Trim('$').AsDecimal();
+        option.OptionPrice = Request["oPrice"].Trim('$').AsDecimal();
+        option.Active = Request["oActive"] == "on" ? true : false;
+      
+
+        if(ModelState.IsValid){
+            if(hasId){
+                option.modifyOrderOption();
+            }
+            else{
+                option.addOrderOption();
+            }
+        }
+
+        Response.Redirect("~/admin/manageOrderOptions/");
+        
+    }
+}
+    
+
+<section id="modifyOrderOption">
+    <header>
+        <h3><a href="~/admin/manageOrderOptions/" class="arrow">&larr;</a>
+            @{if(hasId){<text>Modify</text>}else{<text>Add</text>}}
+            Order Option @{if(hasId){<text>(@option.OptionName)</text>}}
+        </h3>
+    </header>
+
+    <form id="frmModify" method="post" action="">
+        <ul>
+            <li>
+                <label for="oName">Name:</label>
+                <input type="text" id="oName" name="oName" value="@option.OptionName" @Validation.For("oName") />
+                <div>@Html.ValidationMessage("oName")</div>
+            </li>
+
+            <li>
+                <label for="oDesc">Description:</label>
+                <input type="text" id="oDesc" name="oDesc" value="@option.OptionDescription" />
+            </li>
+
+            <li>
+                <label for="oCost">Cost (What we pay):</label>
+                <input type="text" id="oCost" name="oCost" class="oCost" value="@String.Format("{0:C}", option.OptionCost)" @Validation.For("oCost") />
+                <div>@Html.ValidationMessage("oCost")</div>
+            </li>
+
+            <li>
+                <label for="oPrice">Price:</label>
+                <input type="text" id="oPrice" name="oPrice" class="oPrice" value="@string.Format("{0:c}", option.OptionPrice)" @Validation.For("oPrice") />
+                <div>@Html.ValidationMessage("oPrice")</div>
+            </li>
+
+            <li class="checkboxes">
+                <input type="checkbox" id="oActive" name="oActive" checked="@option.Active" />
+                <label for="oActive">Active?</label>
+            </li>
+
+            <li class="actions">
+                <input type="submit" value="@{if(hasId){<text>Save Changes</text>}else{<text>Add New</text>}}" />
+                <button formaction="~/admin/manageOrderOptions">Cancel</button>
+                @if(Roles.IsUserInRole("Master") && hasId){<button formaction="~/admin/deleteOrderOptionConfirm/@Id" class="deleteButton">Delete</button>}
+            </li>
+        </ul>
+    </form>
+</section>

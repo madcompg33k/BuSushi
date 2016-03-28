@@ -1,0 +1,262 @@
+﻿@{
+    Layout = "~/_SiteLayout.cshtml";
+    Page.Title = "Home";
+
+    List<Product> ProductSpecials = _common.getProductSpecials();
+    List<CustomerRoll> CustomerRollSpecials = _common.getCustomerRollSpecials();
+    int specialCount = ProductSpecials.Count + CustomerRollSpecials.Count;
+    string wrapperLength = (specialCount* 1000).ToString() + "px;";
+
+    Discount disc = _common.getDiscountByCode("SPECIAL");
+}
+
+<script type="text/javascript">
+    var spCount = @specialCount;
+    
+    /* Set default previous item to the last */
+    var lastItem = spCount;
+    var previousItem = lastItem;
+
+    /* Set default item to 1 */
+    var currentItem = 1;
+
+    /* Set default next item */
+    var nextItem = 2;
+
+
+    $(function (changeItem) {
+        $("#featuredWrapper").mouseover(function () {
+            $(".border").css("display", "block");
+        });
+
+        $(".border").mouseover(function () {
+            $(".border").css("display", "block");
+        });
+
+        $("#featuredWrapper").mouseout(function () {
+            $(".border").css("display", "none");
+        });
+
+        $(".border").mouseout(function () {
+            $(".border").css("display", "none");
+        });
+
+        $("#right").click(function () {
+            var nextItem = currentItem + 1;
+
+            /* Clear the previous bullet */
+            $("#b" + currentItem).attr({ src: "/images/bulletw-empty.png" });
+
+            /* Check to make sure we haven't reached the end */
+            if ($("#" + (currentItem + 1)).length > 0) {
+                $("#b" + nextItem).attr({ src: "/images/bulletw-filled.png" });
+            } else {
+                /* Reached the end, set next item to the first */
+                nextItem = 1;
+
+                /* Fill the first bullet since there is no next */
+                $("#b1").attr({ src: "/images/bulletw-filled.png" });
+            }
+
+            /* Animate our scrolling */
+            animateScroll(nextItem);
+
+            /* Change the current item to the next */
+            currentItem = nextItem;
+        });
+
+        $("#left").click(function () {
+            previousItem = currentItem - 1;
+
+            /* Clear the previous bullet */
+            $("#b" + currentItem).attr({ src: "/images/bulletw-empty.png" });
+
+            /* Check to make sure we haven't reached the end */
+            if ($("#" + (currentItem - 1)).length > 0) {
+                $("#b" + previousItem).attr({ src: "/images/bulletw-filled.png" });
+            } else {
+                /* Reached the first item, set previous to the last item */
+                previousItem = lastItem;
+
+                /* Fill the last bullet since there is no previous */
+                $("#b" + lastItem).attr({ src: "/images/bulletw-filled.png" });
+            }
+
+            /* Animate our scrolling */
+            animateScroll(previousItem);
+
+            /* Change the current item to the previous */
+            currentItem = previousItem;
+        });
+
+        $(".bulletLink").click(function () {
+            /* Find what item the user is currently on */
+            var oldItem = currentItem;
+
+            /* Set currentItem to the newly selected item */
+            currentItem = parseInt($(this).attr("id").split("")[1], spCount);
+
+            /* Clear bullet from previous item */
+            $("#b" + oldItem).attr({ src: "/images/bulletw-empty.png" })
+
+            /* Set to current bullet to the newly selected item */
+            $("#b" + currentItem).attr({ src: "/images/bulletw-filled.png" })
+
+            /* Animate our scrolling */
+            animateScroll(currentItem);
+        });
+
+
+        function animateScroll(item) {
+            /* Animate our scrolling */
+            $("#scroll-x").stop().animate(
+            {
+                scrollLeft: ((item - 1) * 1000)
+            }, 1000, 'easeInOutExpo');
+        }
+
+    }); /* END $function(changeItem) */
+
+</script>
+
+@section featured {
+<section id="featured" class="featured">
+    @if(specialCount > 1){
+        <a href="#" id="left" class="border"><img src="~/images/arrow-left.png" alt="&lt;" /></a>
+        <a href="#" id="right" class="border"><img src="~/images/arrow-right.png" alt="&gt;" /></a>
+    }
+    
+    <div id="scroll-x">
+        <div id="featuredWrapper" class="slider" style="width: @wrapperLength">
+            @{
+                if(ProductSpecials.Any() || CustomerRollSpecials.Any()){
+                    int item = 1;
+                    int ingredientIterate = 1;
+                    foreach(var row in ProductSpecials){
+                        <div id="@item" class="featured-item">
+                            <a href="~/productdetails/@row.pkProductId"><img src="@row.imgSpURL" alt="@row.Name" class="slide-image" /></a>
+                            <aside class="special-header"><span>Special</span></aside>
+                            <aside>
+                                <h3>
+                                    @row.Name
+                                    @if(row.JPName != null){<text> (@row.JPName)</text>}
+                                </h3><br />
+                                <span class="price">
+                                    <span class="strikethrough">@String.Format("{0:C}", row.Price)</span>
+                                    <span>
+                                        @{
+                                            disc.getDiscountDollar(row.Price);
+                                            <text>@String.Format("{0:C}", row.Price - disc.DiscountDollar)</text>
+                                        }
+                                    </span>
+                                </span>
+                                @if(row.Tags.Count > 0){
+                                    <p class="tags">
+                                        @foreach(var tag in row.Tags){
+                                            <a href="~/products/@tag.TagName/" class="tag">@tag.TagName</a>
+                                        }
+                                    </p>
+                                }
+                                <p>
+                                    @row.Description
+                                </p>
+                            </aside>
+                        </div>
+                        item++;
+                    }
+                    foreach(var row in CustomerRollSpecials){
+                        <div id="@item" class="featured-item">
+                            <a href="#"><img src="@row.imgSpURL" alt="@row.RollName" class="slide-image" /></a>
+                            <aside class="special-header"><span>Customer Roll Special</span></aside>
+                            <aside>
+                                <h3>@row.RollName</h3>
+                                <span class="price">$@row.Price</span>
+                                @if(row.Tags.Count > 0){
+                                    <p class="tags">
+                                        @foreach(var tag in row.Tags){
+                                            <a href="~/products/@tag.TagName/" class="tag">@tag.TagName</a>
+                                        }
+                                    </p>
+                                }
+                                <p>
+                                    @{
+                                        foreach(Ingredient ing in row.IngredientsTop){
+                                            if(string.IsNullOrEmpty(ing.IngredientAltName)){<text>@ing.IngredientName</text>}
+                                            else{<text>@ing.IngredientAltName (@ing.IngredientName)</text>}
+                                            if(ingredientIterate != row.IngredientsTop.Count){<text>,</text>}
+                                            ingredientIterate++;
+                                        }
+
+                                        <text> on top and </text>
+
+                                        ingredientIterate = 1;
+                                        foreach(Ingredient ing in row.IngredientsInside){
+                                            if(string.IsNullOrEmpty(ing.IngredientAltName)){<text>@ing.IngredientName</text>}
+                                            else{<text>@ing.IngredientAltName (@ing.IngredientName)</text>}
+                                            if(ingredientIterate != row.IngredientsTop.Count){<text>,</text>}
+                                            ingredientIterate++;
+                                        }
+                                        <text> inside.</text>
+                                    }
+                                </p>
+                            </aside>
+                        </div>
+                        item++;
+                    }
+                } else{
+                    <div id="1" class="featured-item">
+                        <a href="~/productdetails/6"><img src="/images/sushi/jennroll-sp.jpg" alt="'Jenn' Roll" /></a>
+                        <aside class="special-header"><span>Special</span></aside>
+                        <aside>
+                            <h3>"Jenn" Roll</h3>
+                            <span class="price">$15</span>
+                            <p class="tags">
+                                <a href="~/products/cooked/" class="tag">Cooked</a>
+                                <a href="~/products/seafood/" class="tag">Seafood</a>
+                                <a href="~/products/creamy/" class="tag">Creamy</a>
+                            </p>
+                            <p>
+                                Kanikama (imitation crab), cucumber and cream cheese on the inside topped with ebi shrimp.
+                            </p>
+                        </aside>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+    <div id="bullets">
+        @{
+            int i = 1;
+
+            foreach(var row in ProductSpecials){
+                string aId = "a" + i;
+                string bId = "b" + i;
+                if (i == 1){
+                    <a id="@aId" href="#" class="bulletLink"><img id="@bId" src="~/images/bulletw-filled.png" class="bullet" alt="bullet" /></a>
+                } else{
+                    <a id="@aId" href="#" class="bulletLink"><img id="@bId" src="~/images/bulletw-empty.png" class="bullet" alt="bullet" /></a>
+                }
+                i++;
+            }
+        }
+    </div>
+</section>
+}
+
+
+<section>
+    <div>
+        We deliver sushi twice a week to local businesses in Benson and Sierra Vista, AZ during lunch
+        as well as catering for small to medium sized events. In the future we plan on expanding to deliver to private
+        residences in Bisbee, Benson, Hereford, Sierra Vista, & Tombstone, AZ.
+    </div>
+
+    <div class="fb-like-box" data-href="http://www.facebook.com/busushi2014" data-width="250" data-height="200" data-colorscheme="light" data-show-faces="true" data-header="false" data-stream="false" data-show-border="false"></div>
+
+    <div>
+        We are currently <a href="~/catering/">catering</a> private events, unfortunately we're not ready for lunch delivery just yet.
+        <br />
+        <a href="~/alertMe/">Sign Up</a> to be alerted when we start delivering or 
+        <a href="http://www.facebook.com/busushi2014">join our Facebook page</a> to keep up to date on what's going on.
+    </div>
+</section>

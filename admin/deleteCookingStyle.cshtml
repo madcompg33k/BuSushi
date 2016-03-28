@@ -1,0 +1,31 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Delete Cooking Style";
+
+    if (!Roles.IsUserInRole("Master")){
+        Response.Redirect("~/");
+    }
+
+    var id = UrlData[0].AsInt();
+    var isDeleted = false;
+
+    CookingStyle currentItem = new CookingStyle();
+
+    if(id != null){
+        currentItem = _common.getCookingStyleById(id);
+        currentItem.deleteCookingStyle();
+        isDeleted = true;
+    }
+    else{Response.Redirect("~/admin/");}
+
+}
+
+<section id="itemDeleted">
+    @if(isDeleted){
+        <header><h3>@currentItem.Name deleted!</h3></header>
+        <p>@currentItem.Name has been deleted, this cannot be undone.</p>
+        <p><a href="~/admin/">Return</a></p>
+    } else{
+        <text>There has been an error, please try again.</text>
+    }
+</section>

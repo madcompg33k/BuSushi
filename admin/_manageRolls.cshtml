@@ -1,0 +1,104 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Manage Rolls";
+
+    
+    List<CustomerRoll> customerRolls = _common.getAllCustomerRolls();
+
+
+    var crGrid = new WebGrid(source: customerRolls,
+                                defaultSort: "Name",
+                                rowsPerPage: 15);
+}
+
+<section id="manageRolls">
+    <header>
+        <h3><a href="~/admin" class="arrow">&larr;</a>Manage Rolls <small><a href="~/admin/modifyRoll/">Add New</a></small></h3>
+    </header>
+
+    @prodGrid.GetHtml(
+        tableStyle: "webGrid rollsGrid",
+        headerStyle: "head",
+        alternatingRowStyle: "alt",
+        columns: prodGrid.Columns(
+                                prodGrid.Column("Name", "Name", style: "name"),
+                                prodGrid.Column("RollType", "Type"),
+                                prodGrid.Column("", "Ingredients (Top)", format:(item)=>{
+                                    WebGrid subGrid = new WebGrid(source: item.IngredientsTop);
+                                    return subGrid.GetHtml(
+                                        htmlAttributes: new {@class="subT"},
+                                        columns: subGrid.Columns(
+                                            subGrid.Column("IngredientName", "", canSort: false)
+                                        )
+                                    );
+                                }),
+                                prodGrid.Column("", "Ingredients (Inside)", format:(item)=>{
+                                    WebGrid subGrid = new WebGrid(source: item.IngredientsInside);
+                                    return subGrid.GetHtml(
+                                        htmlAttributes: new {@class="subT"},
+                                        columns: subGrid.Columns(
+                                            subGrid.Column("IngredientName", "", canSort: false)
+                                        )
+                                    );
+                                }),
+                                prodGrid.Column("Price", format:@<text>$@item.Price</text>),
+                                prodGrid.Column("isSpecial", "Special", style: "special"),
+                                prodGrid.Column("discontinued", "Discontinued", style: "discontinued"),
+                                prodGrid.Column(
+                                    style: "options",
+                                    format:
+                                        @<text>
+                                            <a href="~/admin/modifyRoll/@item.pkId">Edit</a>
+                                        </text>)
+        )
+    )
+
+    <header>
+        <h3><a href="~/admin/" class="arrow">&larr;</a>Manage Customer Rolls</h3>
+    </header>
+
+    @crGrid.GetHtml(
+        tableStyle: "webGrid rollsGrid",
+        headerStyle: "head",
+        alternatingRowStyle: "alt",
+        columns: crGrid.Columns(
+            crGrid.Column("RollName", "Name",
+                format:
+                    @<text>
+                        @if(string.IsNullOrEmpty(item.RollName)){<span>(Custom Roll)</span>}
+                        else{<span>@item.RollName</span>}
+                    </text>
+            ),
+            crGrid.Column("RollType", "Type"),
+            crGrid.Column("", "Ingredients (Top)", format:(item)=>{
+                WebGrid subGrid = new WebGrid(source: item.IngredientsTop);
+                return subGrid.GetHtml(
+                    htmlAttributes: new {@class="subT"},
+                    columns: subGrid.Columns(
+                        subGrid.Column("IngredientName", "", canSort: false)
+                    )
+                );
+            }),
+            crGrid.Column("", "Ingredients (Inside)", format:(item)=>{
+                WebGrid subGrid = new WebGrid(source: item.IngredientsInside);
+                return subGrid.GetHtml(
+                    htmlAttributes: new {@class="subT"},
+                    columns: subGrid.Columns(
+                        subGrid.Column("IngredientName", "", canSort: false)
+                    )
+                );
+            }),
+            crGrid.Column("isSpecial", "Special", style: "special"),
+            crGrid.Column(
+                style: "options",
+                format:
+                    @<text>
+                        <a href="~/admin/viewCustomerRoll/@item.pkRollId">View</a>
+                        @if(Roles.IsUserInRole("Master")){
+                            <a href="~/admin/deleteCustomerRollConfirm/@item.pkRollId" class="deleteButton">(Delete)</a>
+                        }
+                    </text>
+            )
+        )
+    )
+</section>

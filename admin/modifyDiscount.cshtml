@@ -1,0 +1,154 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Modify Ingredient";
+
+    var Id = UrlData[0].AsInt();
+    var hasId = !string.IsNullOrEmpty(UrlData[0]);
+    
+    Discount currentItem = null;
+    if(hasId){currentItem = new Discount(Id);}
+    else{currentItem = new Discount(); currentItem.isActive = true;}
+    
+    var products = _common.getAllProducts()
+                        .Select(type => new SelectListItem {
+                            Value = type.pkProductId.ToString(),
+                            Text = type.Name
+                        });
+
+    // Setup validation
+    
+    if (IsPost && Validation.IsValid()) {
+        currentItem.DType = new DiscountType(Request["dType"].AsInt());
+        currentItem.DiscountAmt = Request["Amt"].AsDecimal();
+        currentItem.DiscountCode = Request["Code"];
+        currentItem.DiscountReason = Request["Reason"];
+        currentItem.DiscountStartDate = Request["beginDate"].AsDateTime();
+        currentItem.DiscountEndDate = Request["endDate"].AsDateTime();
+        currentItem.isActive = Request["iActive"] == "on" ? true : false;
+        currentItem.MinRoleRequired = new Role(Request["role"].AsInt());
+        currentItem.MaxUses = Request["maxUses"].AsInt();
+        
+        /* If this item specifically references a product, assign product otherwise do nothing */
+        if(Request["product"].AsInt() != 0){
+            currentItem.ReferenceProduct = new Product(Request["product"].AsInt());
+        }else{currentItem.ReferenceProduct = new Product();}
+        
+        if(ModelState.IsValid){
+            if(hasId){
+                currentItem.modifyDiscount();
+            }
+            else{
+                currentItem.addDiscount();
+            }
+        }
+
+        Response.Redirect("~/admin/");
+        
+    }
+}
+    
+<script type="text/javascript">
+    $(function () {
+        $("#beginDate").datepicker({ minDate: 0 }).datepicker(function () {
+            $("#beginDate").datepicker("option", "dateFormat", 'mm/dd/yy');
+        });
+        $("#endDate").datepicker({ minDate: 1, changeYear: true }).datepicker(function () {
+            $("#endDate").datepicker("option", "dateFormat", 'mm/dd/yy');
+        });
+
+        $("#iActive").change(function(){
+            if(!$(this).is(':checked')){
+                $(".active-checkbox").css("background-color", "#f00");
+                $(".active-checkbox label").css("color", "#fff");
+                $("#isActive").val("true");
+            } else{
+                $(".active-checkbox").css("background-color", "rgba(230, 235, 222, 1)");
+                $(".active-checkbox label").css("color", "#444");
+                $("#isActive").val("false");
+            }
+        });
+    });
+</script>
+
+
+<section id="modifyDiscount" class="modify-item">
+    <header>
+        <h3>
+            <span class="page-title">
+                <a href="~/admin/" class="arrow">&larr;</a>
+                @{if(hasId){<text>Modify</text>}else{<text>Add</text>}} Discount
+            </span>
+            <span class="active-checkbox">
+                <input type="checkbox" id="iActive" name="iActive" checked="@currentItem.isActive" />
+                <label for="iActive">Active?</label>
+            </span>
+        </h3>
+    </header>
+    
+    <form id="frmModify" method="post" action="">
+        <input type="hidden" id="isActive" name="isActive" value="@currentItem.isActive" />
+
+        <ul>
+            <li>
+                @Helpers.discountTypes(currentItem.DType.pkDiscountTypeId)
+            </li>
+
+            <li>
+                <label for="Amt">Discount Amount:</label>
+                <input type="text" id="Amt" name="Amt" value="@currentItem.DiscountAmt" />
+            </li>
+
+            <li>
+                <label for="Code">Discount Code:</label>
+                <input type="text" id="Code" name="Code" value="@currentItem.DiscountCode" />
+            </li>
+
+            <li>
+                <label for="Reason">Discount Reason:</label>
+                <input type="text" id="Reason" name="Reason" value="@currentItem.DiscountReason" />
+            </li>
+
+            <li>
+                <label for="maxUses">Max # of Uses:</label>
+                <input type="text" id="maxUses" name="maxUses" value="@currentItem.MaxUses" />
+            </li>
+
+            <li>
+                <label># of Uses:</label>
+                <label>@currentItem.NumUses</label>
+            </li>
+
+            <li>
+                <label for="product">
+                    Choose a product this applies to:
+                    <br />
+                    <span class="small">(if applies to any product specifically)</span>
+                </label>
+                <br />
+                @Html.DropDownList("product",  "-select-", products, currentItem.ReferenceProduct.pkProductId, new {@class="productField", name="product"})
+            </li>
+
+            <li>
+                <fieldset>
+                    <legend>Special</legend>
+                    <label for="beginDate">Special Begin Date:</label>
+                    <input type="text" id="beginDate" name="beginDate" value="@currentItem.DiscountStartDate" @Validation.For("beginDate") />
+                    <br />
+                    <label for="endDate">Special End Date:</label>
+                    <input type="text" id="endDate" name="endDate" value="@currentItem.DiscountEndDate" @Validation.For("beginDate") />
+                    <div>@Html.ValidationMessage("beginDate")</div>
+                </fieldset>
+            </li>
+
+            <li>
+                @Helpers.roleTypes(1)
+            </li>
+
+            <li class="actions">
+                <input type="submit" value="@{if(hasId){<text>Save Changes</text>}else{<text>Add New</text>}}" />
+                <button formaction="~/admin/manageDiscounts">Cancel</button>
+            </li>
+        </ul>
+
+    </form>
+</section>

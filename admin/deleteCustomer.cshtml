@@ -1,0 +1,18 @@
+﻿@{
+    if (!Roles.IsUserInRole("Master")){Response.Redirect("~/");}
+
+    var Id = UrlData[0].AsInt();
+    Customer currentItem;
+
+    if(Id != null){
+        currentItem = new Customer(Id);
+        currentItem.deleteCustomer();
+        Response.Redirect(Href("~/admin/deleteComplete", true, "customers"));
+    }
+    else{
+        currentItem = new Customer();
+        Response.Redirect(Href("~/admin/deleteComplete", false, "customers"));
+    }
+
+}
+

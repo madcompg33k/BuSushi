@@ -1,0 +1,45 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Add Tag";
+
+    Tag tag = new Tag();
+    
+    // Setup validation
+    Validation.RequireField("tagName", "You must specify an name.");
+
+    if (IsPost && Validation.IsValid()) {
+        tag.TagName = Request["tagName"];
+
+        if(ModelState.IsValid){
+            tag.addTag();
+        }
+
+        Response.Redirect("~/admin/index/");
+        
+    }
+}
+    
+
+
+
+<section id="addTag">
+    <header>
+        <h3><a href="~/admin/" class="arrow">&larr;</a> Add Tag</h3>
+    </header>
+
+    <form id="frmModify" method="post" action="">
+        <ul>
+            <li>
+                <label for="tagName">Name:</label>
+                <input type="text" id="tagName" name="tagName" value="" @Validation.For("iName") />
+                <div>@Html.ValidationMessage("tagName")</div>
+            </li>
+
+            <li class="actions">
+                <input type="submit" value="Add New" />
+                <button formaction="~/admin/">Cancel</button>
+            </li>
+        </ul>
+
+    </form>
+</section>

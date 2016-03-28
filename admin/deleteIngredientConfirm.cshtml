@@ -1,0 +1,68 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Delete Ingredient";
+
+    if (!Roles.IsUserInRole("Master")){
+        Response.Redirect("~/");
+    }
+
+    var id = UrlData[0].AsInt();
+    
+    Ingredient currentItem;
+    
+    if(id != null){currentItem = new Ingredient(id);}
+    else{
+        currentItem = new Ingredient();
+        Response.Redirect("~/admin/");
+    }
+
+    var db = Database.Open("buSushi");
+    var productQuery = db.Query(@"SELECT fil.*, p.Name FROM FoodIngredientLookup fil
+                            LEFT JOIN Food f ON f.pkFoodId = fil.fkFoodId
+                            INNER JOIN Products p ON p.pkId = f.fkProductId
+                            WHERE fil.fkIngredientId = @0", currentItem.pkIngredientId);
+    var customerRollQuery = db.Query(@"SELECT cril.*, crl.RollName FROM CustomerRollIngredientLookup cril
+                                        INNER JOIN CustomerRolls cr ON cr.pkRollId = cril.fkRollId
+                                        LEFT JOIN CustomerRollLookup crl on crl.fkRollId = cr.pkRollId
+                                        WHERE cril.fkIngredientId = @0", currentItem.pkIngredientId);
+}
+    
+
+<section id="deleteTag">
+    <header>
+        <h3>Delete Ingredient (@currentItem.IngredientName)</h3>
+    </header>
+
+    @if(productQuery.Any() || customerRollQuery.Any()){
+        <div>
+            We're sorry but this item is referenced by other items. Please remove this reference before
+            deleting this item.
+            <br />
+            Items referencing this object:
+            @if(productQuery.Any()){
+                <p>Products</p>
+                foreach(var row in productQuery){
+                    if(String.IsNullOrEmpty(row.Name)){<span>(No Name)</span><br />}
+                    else{<span>@row.Name</span><br />}
+                }
+            }
+            @if(customerRollQuery.Any()){
+                foreach(var row in customerRollQuery){
+                    if(String.IsNullOrEmpty(row.RollName)){<span>(No Name)</span><br />}
+                    else{<span>row.RollName</span><br />}
+                }
+            }
+            <p><a href="@Href("~/admin/manageIngredients")">Return</a></p>
+            
+        </div>
+    }else{
+        <form id="frmDelete" method="delete" action="~/admin/deleteIngredient/@id">
+            <h2>Are you sure you want to delete @currentItem.IngredientName? (ID: @currentItem.pkIngredientId)</h2>
+            <small>(This action is irreversible)</small>
+
+            <input type="submit" value="Yes" />
+            <button formaction="~/admin/">No</button>
+        </form>
+    }
+    
+</section>

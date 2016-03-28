@@ -1,0 +1,46 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Manage Rolls";
+
+    
+    List<Sushi> sushi = _common.getAllSushi();
+
+    var prodGrid = new WebGrid(source: sushi,
+                                defaultSort: "Name",
+                                rowsPerPage: 15);
+}
+
+<section id="manageRolls">
+    <header>
+        <h3><a href="~/admin" class="arrow">&larr;</a>Manage Sushi <small><a href="~/admin/modifySushi/">Add New</a></small></h3>
+    </header>
+
+    @prodGrid.GetHtml(
+        tableStyle: "webGrid productGrid",
+        headerStyle: "head",
+        alternatingRowStyle: "alt",
+        columns: prodGrid.Columns(
+                                prodGrid.Column("Name", "Name", style: "name"),
+                                prodGrid.Column("SushiType", "Type"),
+                                prodGrid.Column("", "Ingredients", format:(item)=>{
+                                    WebGrid subGrid = new WebGrid(source: item.Ingredients);
+                                    return subGrid.GetHtml(
+                                        htmlAttributes: new {@class="subT"},
+                                        columns: subGrid.Columns(
+                                            subGrid.Column("IngredientName", "", canSort: false)
+                                        )
+                                    );
+                                }),
+                                prodGrid.Column("Price", format:@<text>$@item.Price</text>),
+                                prodGrid.Column("isSpecial", "Special", style: "special"),
+                                prodGrid.Column("discontinued", "Discontinued", style: "discontinued"),
+                                prodGrid.Column(
+                                    style: "options",
+                                    format:
+                                        @<text>
+                                            <a href="~/admin/modifySushi/@item.pkId">Edit</a>
+                                        </text>)
+        )
+    )
+
+</section>

@@ -1,0 +1,42 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Delete Schedule Item";
+
+    if (!Roles.IsUserInRole("Master")){
+        Response.Redirect("~/");
+    }
+
+    var id = UrlData[0].AsInt();
+    
+    DeliveryScheduleItem currentItem;
+    
+    if(id != null){currentItem = new DeliveryScheduleItem(id);}
+    else{
+        currentItem = new DeliveryScheduleItem();
+        Response.Redirect("~/admin/");
+    }
+    var db = Database.Open("buSushi");
+    var sql = db.Query(@"SELECT ds.pkDeliveryId FROM DeliverySchedule ds
+                            INNER JOIN Orders o ON o.fkDeliveryId = ds.pkDeliveryId
+                            WHERE ds.pkDeliveryId = @0", id);
+}
+    
+
+<section id="deleteTag">
+    <header>
+        <h3>@Page.Title (@(((DateTime)currentItem.DeliveryDate).ToShortDateString()))</h3>
+    </header>
+
+    @if(sql.Any()){
+        <h2>You may not delete this schedule item, it is being referenced by orders.</h2>
+        <a href="~/admin/">&larr; Go Back</a>
+    }else{
+        <form id="frmDelete" method="delete" action="~/admin/deleteScheduleItem/@id">
+            <h2>Are you sure you want to delete the scheduled delivery date @(((DateTime)currentItem.DeliveryDate).ToShortDateString())? (ID: @currentItem.pkDeliveryId)</h2>
+            <small>(This action is irreversible)</small>
+
+            <input type="submit" value="Yes" />
+            <button formaction="~/admin/">No</button>
+        </form>
+    }
+</section>

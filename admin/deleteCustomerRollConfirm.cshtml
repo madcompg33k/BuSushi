@@ -1,0 +1,48 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Delete Customer Roll";
+
+    if (!Roles.IsUserInRole("Master")){
+        Response.Redirect("~/");
+    }
+
+    var id = UrlData[0].AsInt();
+    
+    CustomerRoll currentItem = null;
+
+    if(id != null){currentItem = new CustomerRoll(id);}
+    else{Response.Redirect("~/admin/");}
+
+    var db = Database.Open("buSushi");
+    var query = db.Query(@"SELECT cr.pkRollId, o.pkOrderId, c.FName + c.LName AS Name FROM CustomerRolls cr
+                    INNER JOIN OrderItems oi ON oi.fkRollId = cr.pkRollId
+                    INNER JOIN Orders o ON o.pkOrderId = oi.fkOrderId
+                    INNER JOIN webpages_membership u ON u.UserId = o.fkUserId
+                    INNER JOIN Customers c ON c.fkUserId = u.UserId");
+}
+    
+
+<section id="deleteProductRoll">
+    <header>
+        <h3>Delete Roll (@currentItem.RollName)</h3>
+    </header>
+
+    @if(!query.Any()){
+        <form id="frmDelete" method="delete" action="~/admin/deleteCustomerRoll/@id">
+            <h2>Are you sure you want to delete @currentItem.RollName? (ID: @currentItem.pkCustomerRollId)</h2>
+            <small>(This action is irreversible)</small>
+
+            <input type="submit" value="Yes" />
+            <button formaction="~/admin/viewCustomerRoll/@id">No</button>
+        </form>
+    } else{
+        <div>
+            Sorry, but this customer's roll <i>(ID: @query.First().pkCustomerRollId)</i> is referenced by previous orders and cannot be deleted.
+            <h4>Customer's orders referencing this roll:</h4>
+            <ul>
+                @foreach(var row in query){<li><strong>Name:</strong> @row.Name <i>(OrderId: @row.pkOrderId)</i></li>}
+            </ul>
+            <a href="~/admin">Back</a>
+        </div>
+    }
+</section>

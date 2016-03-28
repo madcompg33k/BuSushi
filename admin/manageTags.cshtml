@@ -1,0 +1,60 @@
+﻿@{
+    Layout = "~/admin/_AdminLayout.cshtml";
+    Page.Title = "Manage Tags";
+
+    var gridTags = new WebGrid(_common.getAllTags(), rowsPerPage: 15);
+}
+
+<script>
+    $(function () {
+        $('.edit-mode').hide();
+        $('.edit-tag').on('click', function () {
+            var tr = $(this).parents('tr:first');
+            tr.find('.edit-mode, .display-mode').toggle();
+        });
+        $('.save-tag').on('click', function () {
+            var tr = $(this).parents('tr:first');
+            var tagId = $(this).prop('id');
+            var tagName = tr.find('#TagName').val();
+            $.post(
+                '/admin/EditTag',
+                { Id: tagId, Name: tagName },
+                function(tag){
+                    tr.find('#tag-name').text(tag.Tag);
+                }, "json");
+            tr.find('.edit-mode, .display-mode').toggle();
+        });
+    });
+</script>
+
+<section>
+    <header>
+        <h3><a href="~/admin">&larr;</a>@Page.Title</h3>
+    </header>
+
+    <div>
+        <header><h3>Tags</h3> (<a href="~/admin/addTag/">Add New</a>)</header>
+        @gridTags.GetHtml(
+            tableStyle: "webGrid",
+            headerStyle: "head",
+            alternatingRowStyle: "alt",
+            columns: gridTags.Columns(
+                gridTags.Column("TagName", "Tag Name",
+                                style: "name",
+                                format:
+                                    @<text>
+                                        <span id="tag-name" class="display-mode">@item.TagName</span>
+                                        @Html.TextBox("TagName", item.TagName, new {@class="edit-mode", size=100})
+                                    </text>),
+                gridTags.Column("",
+                    style: "options",
+                    format:
+                        @<text>
+                            <button class="edit-tag display-mode" id="@item.pkTagId">Edit</button>
+                            <button class="save-tag edit-mode" id="@item.pkTagId">Save</button>
+                            @if(Roles.IsUserInRole("Master")){<a href="~/admin/deleteTagConfirm/@item.pkTagId" class="deleteButton">(Delete)</a>}
+                        </text>)
+            )
+        )
+    </div>
+</section>
